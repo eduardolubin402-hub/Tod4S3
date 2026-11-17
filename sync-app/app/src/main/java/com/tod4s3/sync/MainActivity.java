@@ -1788,12 +1788,37 @@ public final class MainActivity extends Activity {
         LinearLayout form = new LinearLayout(this);
         form.setOrientation(LinearLayout.VERTICAL);
         form.setPadding(dp(8), dp(6), dp(8), dp(2));
+        FrameLayout medal = new FrameLayout(this);
+        GradientDrawable medalBg = new GradientDrawable();
+        medalBg.setShape(GradientDrawable.OVAL);
+        medalBg.setColor(Color.TRANSPARENT);
+        medalBg.setStroke(dp(3), Color.rgb(255, 204, 76));
+        medal.setBackground(medalBg);
+        TextView star = text("★", 29, true);
+        star.setGravity(Gravity.CENTER);
+        star.setTextColor(Color.rgb(255, 204, 76));
+        medal.addView(star, new FrameLayout.LayoutParams(dp(76), dp(76), Gravity.CENTER));
+        LinearLayout.LayoutParams medalParams = new LinearLayout.LayoutParams(dp(82), dp(82));
+        medalParams.gravity = Gravity.CENTER_HORIZONTAL;
+        form.addView(medal, medalParams);
+        TextView activationTitle = text("Activa tu código", 21, true);
+        activationTitle.setGravity(Gravity.CENTER);
+        form.addView(activationTitle, margin(0, 10, 0, 3));
+        TextView activationHint = bodyText("Pega el código secreto que te dio el vendedor");
+        activationHint.setGravity(Gravity.CENTER);
+        form.addView(activationHint, margin(0, 0, 0, 10));
         form.addView(bodyText("Pega el código que te entregó el administrador. Solo sirve para tu ID de Telegram y este móvil."));
         EditText codeField = input("Ejemplo: T4S3-…", android.text.InputType.TYPE_CLASS_TEXT
                 | android.text.InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
                 | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         codeField.setSingleLine(true);
+        codeField.setBackground(roundRect(Color.rgb(24, 24, 31), 14, Color.rgb(255, 204, 76)));
         form.addView(codeField, margin(0, 10, 0, 6));
+        TextView warning = bodyText("✓  Se liga a este teléfono en el primer canje\n✓  No puede reutilizarse en otro móvil\n✓  Vence junto con tu plan\n✓  Lo verifica el servidor con tu cuenta");
+        warning.setTextSize(12);
+        warning.setPadding(dp(12), dp(10), dp(12), dp(10));
+        warning.setBackground(roundRect(Color.rgb(29, 27, 29), 15, Color.rgb(75, 67, 48)));
+        form.addView(warning, margin(0, 8, 0, 7));
         TextView status = bodyText("");
         status.setTextColor(Color.rgb(255, 205, 116));
         form.addView(status);
@@ -1887,6 +1912,20 @@ public final class MainActivity extends Activity {
         LinearLayout form = new LinearLayout(this);
         form.setOrientation(LinearLayout.VERTICAL);
         form.setPadding(dp(8), dp(4), dp(8), dp(2));
+        LinearLayout steps = new LinearLayout(this);
+        steps.setGravity(Gravity.CENTER);
+        String[] stepNames = {"1\nTus datos", "2\nChat directo", "3\nComprobante"};
+        for (int i = 0; i < stepNames.length; i++) {
+            TextView step = text(stepNames[i], 10, true);
+            step.setGravity(Gravity.CENTER);
+            step.setTextColor(i == 0 ? Color.WHITE : Color.rgb(170, 170, 180));
+            step.setBackground(roundRect(i == 0 ? Color.rgb(242, 30, 58) : Color.rgb(28, 29, 37), 18,
+                    i == 0 ? Color.rgb(242, 30, 58) : Color.rgb(75, 75, 85)));
+            LinearLayout.LayoutParams stepParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
+            if (i > 0) stepParams.setMargins(dp(6), 0, 0, 0);
+            steps.addView(step, stepParams);
+        }
+        form.addView(steps, margin(0, 0, 0, 12));
         form.addView(bodyText("Plan seleccionado: " + selectedPlan), margin(0, 0, 0, 12));
 
         EditText nameInput = input("Tu nombre", android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS);
@@ -1917,7 +1956,11 @@ public final class MainActivity extends Activity {
         paymentError.setVisibility(View.GONE);
         form.addView(paymentError);
         paymentChoice.setOnCheckedChangeListener((group, checkedId) -> paymentError.setVisibility(View.GONE));
-        form.addView(bodyText("Para enviar texto y captura juntos, elige la primera opción y selecciona en Telegram el chat del administrador al que deseas enviar la solicitud. La opción de chat directo abre Telegram con el texto preparado; allí adjuntas la captura manualmente."), margin(0, 10, 0, 10));
+        TextView prepared = bodyText("TEXTO PREPARADO\nHola @Niku_Blade, quiero activar Premium.\n\nEl comprobante se adjunta dentro del chat, no en la app.");
+        prepared.setTextSize(12);
+        prepared.setPadding(dp(12), dp(10), dp(12), dp(10));
+        prepared.setBackground(roundRect(Color.rgb(27, 26, 31), 15, Color.rgb(70, 64, 76)));
+        form.addView(prepared, margin(0, 10, 0, 10));
         Button shareReceipt = goldButton("Adjuntar captura + texto");
         form.addView(shareReceipt, margin(0, 0, 0, 8));
         Button directChat = secondaryButton("Abrir chat directo");
@@ -5483,20 +5526,23 @@ public final class MainActivity extends Activity {
     }
 
     private void addProgress(LinearLayout page, int activeStep) {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        String[] labels = {"1  Bot", "2  Teléfono", "3  Código"};
-        for (int i = 0; i < labels.length; i++) {
-            int step = i + 1;
-            TextView item = text(labels[i], 11, true);
-            item.setGravity(Gravity.CENTER);
-            item.setTextColor(step <= activeStep ? Color.WHITE : Color.rgb(165, 166, 176));
-            item.setBackground(roundRect(step <= activeStep ? Color.rgb(242, 30, 58) : Color.rgb(28, 29, 37), 18, 0));
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(34), 1f);
-            if (i > 0) lp.setMargins(dp(6), 0, 0, 0);
-            row.addView(item, lp);
-        }
-        page.addView(row);
+        TextView stepLabel = text("PASO " + Math.max(1, activeStep) + " DE 2", 10, true);
+        stepLabel.setTextColor(Color.rgb(242, 30, 58));
+        stepLabel.setLetterSpacing(0.08f);
+        page.addView(stepLabel, margin(0, 2, 0, 7));
+        LinearLayout track = new LinearLayout(this);
+        track.setOrientation(LinearLayout.HORIZONTAL);
+        track.setBackground(roundRect(Color.rgb(57, 45, 52), 8, 0));
+        View filled = new View(this);
+        filled.setBackground(roundRect(Color.rgb(242, 30, 58), 8, 0));
+        LinearLayout.LayoutParams fillParams = new LinearLayout.LayoutParams(0, dp(5),
+                Math.max(1, Math.min(2, activeStep)) / 2f);
+        track.addView(filled, fillParams);
+        View remainder = new View(this);
+        remainder.setBackground(roundRect(Color.rgb(255, 183, 65), 8, 0));
+        track.addView(remainder, new LinearLayout.LayoutParams(0, dp(5),
+                1f - Math.max(1, Math.min(2, activeStep)) / 2f));
+        page.addView(track, margin(0, 0, 0, 4));
     }
 
     private boolean isDarkTheme() {

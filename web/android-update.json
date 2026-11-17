@@ -3,6 +3,5 @@
   "version_name": "1.5.52",
   "manifest_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/web/android-update.json",
   "apk_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/Tod4S3-Sync-v1.5.52.apk",
-  "sha256": "65e538f60a08b2a11d070ed49979352b4dbfc2cd7b4c3354a4d305669a079649",
-  "release_notes": "Tareas activas persistentes en Descargas y menú lateral accesible."
+  "sha256": "65e538f60a08b2a11d070ed49979352b4dbfc2cd7b4c3354a4d305669a079649"
 }

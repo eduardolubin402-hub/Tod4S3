@@ -2307,7 +2307,9 @@ public final class MainActivity extends Activity {
     private LinearLayout buildDashboardPlanCard() {
         LinearLayout summary = new LinearLayout(this);
         summary.setOrientation(LinearLayout.VERTICAL);
-        summary.setPadding(dp(15), dp(12), dp(15), dp(12));
+        summary.setPadding(dp(15), dp(12), dp(15), dp(9));
+        summary.setMinimumHeight(0);
+        summary.setClipToPadding(true);
         int start = premiumActive ? (isDarkTheme() ? Color.rgb(49, 40, 27) : Color.rgb(255, 248, 227))
                 : (isDarkTheme() ? Color.rgb(22, 36, 50) : Color.rgb(235, 245, 250));
         int end = premiumActive ? (isDarkTheme() ? Color.rgb(29, 29, 40) : Color.rgb(255, 255, 255))
@@ -2337,6 +2339,8 @@ public final class MainActivity extends Activity {
         summary.addView(header);
         quotaUsageBox = new LinearLayout(this);
         quotaUsageBox.setOrientation(LinearLayout.VERTICAL);
+        quotaUsageBox.setMinimumHeight(0);
+        quotaUsageBox.setPadding(0, 0, 0, 0);
         summary.addView(quotaUsageBox, margin(0, 9, 0, 0));
         summary.setContentDescription("Plan activo y consumo de datos. Toca para ver planes y ofertas.");
         summary.setOnClickListener(v -> showPlansStep(true));
@@ -4224,17 +4228,7 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams optionsParams = new LinearLayout.LayoutParams(dp(34), dp(34));
         optionsParams.setMargins(dp(5), 0, 0, 0);
         header.addView(chatOptions, optionsParams);
-        chatOptions.setOnClickListener(v -> new AlertDialog.Builder(this)
-                .setTitle("Opciones del chat")
-                .setItems(new String[]{"Preguntas frecuentes", "Limpiar conversación"}, (dialog, which) -> {
-                    if (which == 0) {
-                        showAiFaqDialog();
-                    } else if (aiChatRequestInFlight) {
-                        Toast.makeText(this, "Espera a que termine la respuesta antes de limpiar.", Toast.LENGTH_SHORT).show();
-                    } else {
-                        confirmClearAiChat();
-                    }
-                }).show());
+        chatOptions.setOnClickListener(this::showAiChatOptions);
         page.addView(header);
 
         aiChatStatus = text("●  LISTA PARA AYUDAR", 9, true);
@@ -4609,6 +4603,39 @@ public final class MainActivity extends Activity {
         } else {
             aiConversationScroll.post(() -> aiConversationScroll.scrollTo(0, 0));
         }
+    }
+
+    private void showAiChatOptions(View anchor) {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(8), dp(8), dp(8), dp(8));
+        panel.setBackground(roundRect(Color.rgb(25, 27, 26), 18, Color.rgb(81, 91, 84)));
+        panel.setElevation(dp(18));
+        TextView title = text("Opciones del chat", 12, true);
+        title.setTextColor(Color.rgb(209, 221, 204));
+        panel.addView(title, margin(8, 3, 8, 6));
+        TextView faq = text("Preguntas frecuentes", 12, true);
+        faq.setPadding(dp(10), dp(10), dp(10), dp(10));
+        faq.setTextColor(Color.WHITE);
+        faq.setBackground(roundRect(Color.rgb(35, 43, 38), 12, Color.rgb(74, 98, 82)));
+        panel.addView(faq, margin(0, 0, 0, 5));
+        TextView clear = text("Limpiar conversación", 12, true);
+        clear.setPadding(dp(10), dp(10), dp(10), dp(10));
+        clear.setTextColor(Color.rgb(255, 155, 172));
+        clear.setBackground(roundRect(Color.rgb(48, 27, 34), 12, Color.rgb(126, 54, 72)));
+        panel.addView(clear);
+        PopupWindow popup = new PopupWindow(panel, dp(220), -2, true);
+        popup.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        popup.setOutsideTouchable(true);
+        popup.setElevation(dp(18));
+        faq.setOnClickListener(v -> { popup.dismiss(); showAiFaqDialog(); });
+        clear.setOnClickListener(v -> {
+            popup.dismiss();
+            if (aiChatRequestInFlight) Toast.makeText(this,
+                    "Espera a que termine la respuesta antes de limpiar.", Toast.LENGTH_SHORT).show();
+            else confirmClearAiChat();
+        });
+        popup.showAsDropDown(anchor, -dp(186), dp(5));
     }
 
     private void addAiFaqRow(LinearLayout parent, int firstIndex, int secondIndex) {
@@ -6336,6 +6363,7 @@ public final class MainActivity extends Activity {
             quotaUsageBox.removeAllViews();
             quotaUsageBox.setVisibility(View.GONE);
             quotaUsageBox.setTag(null);
+            quotaUsageBox.setMinimumHeight(0);
             quotaProgressBar = null;
             quotaUsageText = null;
             quotaResetText = null;
@@ -6346,6 +6374,7 @@ public final class MainActivity extends Activity {
         if (currentMode == null || currentMode != freePlan || quotaUsageText == null || quotaResetText == null) {
             quotaUsageBox.removeAllViews();
             quotaUsageBox.setTag(freePlan);
+            quotaUsageBox.setMinimumHeight(0);
             quotaProgressBar = null;
             String titleText = freePlan ? "CONSUMO DE DATOS · 1 GB / 24 H" : "DATOS USADOS · PREMIUM ILIMITADO";
             TextView title = text(titleText, 10, true);

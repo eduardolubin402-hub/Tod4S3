@@ -1,7 +1,8 @@
 {
-  "version_code": 99,
-  "version_name": "1.5.54",
+  "version_code": 100,
+  "version_name": "1.5.55",
   "manifest_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/web/android-update.json",
-  "apk_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/Tod4S3-Sync-v1.5.54.apk",
-  "sha256": "2f82eb176134178288e1945f5e1bf4a1b4ae4758ca2c57f05b5b903ac196038f"
+  "apk_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/Tod4S3-Sync-v1.5.55.apk",
+  "sha256": "863edef2a7d18ff0758eb3fb9f4b8f6c4346d93fc099834cb727814183514589",
+  "release_notes": "Menú estilizado de AiTod4S3 y corrección del espacio sobrante en la tarjeta de consumo."
 }

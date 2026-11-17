@@ -5651,7 +5651,7 @@ async def top_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not is_private_update(update):
         return
-    """Ejecuta una copia inmediata y devuelve un diagnóstico seguro al dueño."""
+    """Permite al dueño restaurar la copia fijada o publicar una copia inmediata."""
     user = update.effective_user
     message = update.effective_message
     if not user or not message or not is_owner(user.id):
@@ -5665,6 +5665,47 @@ async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if lock is None:
         lock = asyncio.Lock()
         context.application.bot_data["telegram_backup_lock"] = lock
+    action = " ".join(getattr(context, "args", []) or []).strip().casefold()
+    if action in {"restaurar", "restore"}:
+        try:
+            async with lock:
+                restored_files, restored_bytes, found = await restore_from_telegram(
+                    context.bot,
+                    getattr(context.bot, "token", ""),
+                    chat_id,
+                    layout,
+                    logger=log,
+                    return_found=True,
+                )
+        except Exception as exc:
+            context.application.bot_data["telegram_backup_hold"] = True
+            log.warning("Restauración manual de respaldo fallida (%s).", type(exc).__name__)
+            await message.reply_text(sc(
+                "❌ No se pudo leer el respaldo fijado. Revisa TELEGRAM_BACKUP_CHAT_ID, "
+                "los permisos del bot y que se conserve el mismo token de Telegram."
+            ))
+            return
+        if not found:
+            context.application.bot_data["telegram_backup_hold"] = True
+            await message.reply_text(sc(
+                "❌ No encontré una copia fijada visible en el chat configurado. "
+                "No cambié datos locales. Fija allí el documento cifrado y vuelve a intentar; "
+                "usa /backup sin argumentos solo si quieres crear una copia nueva."
+            ))
+            return
+        if restored_files == 0:
+            context.application.bot_data["telegram_backup_hold"] = True
+            await message.reply_text(sc(
+                "⚠️ Encontré la copia, pero no restauré archivos porque los locales ya contienen datos. "
+                "No los sobrescribí para evitar perder cambios."
+            ))
+            return
+        context.application.bot_data["telegram_backup_hold"] = False
+        await message.reply_text(sc(
+            f"✅ Restauré {restored_files} archivos ({restored_bytes} bytes) desde la copia fijada. "
+            "Prueba de nuevo la descarga. Solo se restauran archivos locales ausentes o vacíos."
+        ))
+        return
     try:
         async with lock:
             saved = await backup_to_telegram(
@@ -8297,6 +8338,33 @@ def _register_app_update_ban_notifier(application: Application, loop: asyncio.Ab
     configure(notifier)
 
 
+async def restore_backup_with_retries(
+    bot, bot_token: str, backup_chat_id: str, backup_layout: BackupLayout, *,
+    logger: logging.Logger, attempts: int = 3, delay_seconds: int = 2,
+) -> tuple[tuple[int, int, bool], bool]:
+    """Reintenta errores transitorios sin tratar un chat sin pin como copia válida."""
+    for attempt in range(1, attempts + 1):
+        try:
+            result = await restore_from_telegram(
+                bot, bot_token, backup_chat_id, backup_layout,
+                logger=logger, return_found=True,
+            )
+            return result, False
+        except Exception as exc:
+            if attempt == attempts:
+                logger.warning(
+                    "Se agotaron los reintentos de restauración (%s).",
+                    type(exc).__name__,
+                )
+                return (0, 0, False), True
+            logger.warning(
+                "Falló la restauración del backup; reintento %d/%d (%s).",
+                attempt + 1, attempts, type(exc).__name__,
+            )
+            await asyncio.sleep(delay_seconds * attempt)
+    return (0, 0, False), True
+
+
 async def post_init(application: Application) -> None:
     loop = asyncio.get_running_loop()
     from web_store import configure_app_backup_notifier, configure_app_task_bridge
@@ -8347,27 +8415,36 @@ async def post_init(application: Application) -> None:
 
     # Restaurar datos antes de abrir la sesión MTProto de Telegram.
     if backup_chat_id:
-        restored_files = 0
-        restore_found = False
-        restore_failed = False
-        try:
-            restored_files, restored_bytes, restore_found = await restore_from_telegram(
-                application.bot,
-                getattr(application.bot, "token", ""),
-                backup_chat_id,
-                backup_layout,
-                logger=log,
-                return_found=True,
-            )
-            log.info("Restauración inicial terminada: archivos=%d bytes=%d", restored_files, restored_bytes)
-        except Exception as exc:
-            restore_failed = True
-            log.warning("Se continúa sin restaurar la copia Telegram (%s).", type(exc).__name__)
+        restore_pointer_exists = (backup_layout.data_dir / ".telegram_backup_message_id").is_file()
+        (restored_files, restored_bytes, restore_found), restore_failed = await restore_backup_with_retries(
+            application.bot,
+            getattr(application.bot, "token", ""),
+            backup_chat_id,
+            backup_layout,
+            logger=log,
+        )
+        log.info(
+            "Restauración inicial terminada: encontrada=%s archivos=%d bytes=%d",
+            restore_found, restored_files, restored_bytes,
+        )
         persist_todus_bot_phone()
-        backup_hold = restore_failed or (restore_found and restored_files == 0)
+        backup_hold = (
+            restore_failed
+            or (restore_found and restored_files == 0)
+            or (restore_pointer_exists and not restore_found)
+        )
         application.bot_data["telegram_backup_hold"] = backup_hold
         if backup_hold:
-            log.error("Se pausó el reemplazo automático del backup porque no se restauró ningún archivo o la comprobación falló. Revisa el estado y ejecuta /backup para confirmar manualmente.")
+            if restore_pointer_exists and not restore_found and not restore_failed:
+                log.error(
+                    "No se encontró el mensaje fijado aunque hay un puntero local de backup; "
+                    "se pausó toda escritura para proteger la copia anterior. Revisa el chat configurado."
+                )
+            else:
+                log.error(
+                    "Se pausó el reemplazo automático del backup porque no se restauró ningún archivo "
+                    "o la comprobación falló. Revisa el estado y usa /backup restaurar."
+                )
         else:
             for attempt in range(1, 4):
                 try:

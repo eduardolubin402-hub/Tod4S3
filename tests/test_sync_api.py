@@ -135,6 +135,7 @@ def test_delete_delivery_rejects_url_outside_user_namespace(tmp_path, monkeypatc
 
 
 def test_native_todus_delivery_is_not_sent_to_s3_delete(tmp_path, monkeypatch):
+    monkeypatch.setattr(web_store, "_APP_TASK_BRIDGE", None)
     url = "https://media.todus.cu/download/file-token"
     _prepare_delivery(tmp_path, monkeypatch, [url], storage_backend="todus_native")
     deleted = []
@@ -147,6 +148,24 @@ def test_native_todus_delivery_is_not_sent_to_s3_delete(tmp_path, monkeypatch):
     assert web_store._delivery_cloud_deletable(row, 42) is False
     assert status == 503
     assert payload["error"] == "task_service_unavailable"
+    assert deleted == []
+    assert sync_api.delivery_for_user(42, "task-delete") is not None
+
+
+def test_native_todus_delivery_reports_unavailable_api_when_bridge_fails(tmp_path, monkeypatch):
+    url = "https://media.todus.cu/download/file-token"
+    _prepare_delivery(tmp_path, monkeypatch, [url], storage_backend="todus_native")
+    deleted = []
+    monkeypatch.setattr(web_store, "delete_from_todus_s3", deleted.append)
+
+    def broken_bridge(*_args):
+        raise RuntimeError("bridge unavailable")
+
+    monkeypatch.setattr(web_store, "_APP_TASK_BRIDGE", broken_bridge)
+    payload, status = web_store.delete_delivery_for_token("app-token", "task-delete")
+
+    assert status == 503
+    assert payload["error"] == "task_api_unavailable"
     assert deleted == []
     assert sync_api.delivery_for_user(42, "task-delete") is not None
 

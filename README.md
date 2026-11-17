@@ -72,7 +72,7 @@ El bot restaura primero la copia fijada y luego inicia MTProto. Guarda automáti
 - `MAX_CONCURRENT_UPLOADS`: workers simultáneos de transferencias; predeterminado 3.
 - `MAX_AUTO_RETRIES`: reintentos ante errores temporales de red, Telegram o ToDus; predeterminado 2.
 
-Las tareas de usuarios VIP usan una cola prioritaria: VIP Básico, VIP Medio y Premium se atienden antes que el plan Gratis, conservando el orden FIFO entre tareas del mismo nivel. Los reintentos automáticos solo se aplican a fallos transitorios; los enlaces inválidos, límites de cuota y errores permanentes siguen mostrando el error sin repetir la tarea indefinidamente.
+Las tareas de usuarios VIP reciben prioridad en la cola, conservando el orden FIFO dentro de la cola personal de cada usuario. Para evitar que una espera prolongada bloquee a otros planes, cada minuto en cola aumenta la prioridad de la tarea hasta que obtiene un worker. Los reintentos automáticos solo se aplican a fallos transitorios; los enlaces inválidos, límites de cuota y errores permanentes siguen mostrando el error sin repetir la tarea indefinidamente.
 
 ## Saldo y referidos
 

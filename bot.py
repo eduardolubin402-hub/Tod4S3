@@ -31,6 +31,7 @@ from dotenv import load_dotenv
 from telegram import (
     BotCommand,
     CopyTextButton,
+    InputMediaAnimation,
     InputMediaPhoto,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -89,6 +90,7 @@ from sync_api import create_pairing_code, record_delivery
 
 TELEGRAM_BOT_TOKEN = ""
 OWNER_TELEGRAM_ID = ""
+WELCOME_ANIMATION_PATH = Path(__file__).with_name("todus_s3_menu_animation.mp4")
 WELCOME_IMAGE_PATH = Path(__file__).with_name("IMG_20261102_161854_801.jpg")
 
 logging.basicConfig(
@@ -2859,26 +2861,49 @@ def btn(text: str, **kwargs) -> InlineKeyboardButton:
 
 
 def main_keyboard(user_id: int | None = None) -> InlineKeyboardMarkup:
-    rows = [
-        [InlineKeyboardButton("📥 DESCARGAS", callback_data="downloads", style="success")],
-        [InlineKeyboardButton("📱 VINCULAR APLICACIÓN", callback_data="app:pair", style="success")],
+    rows = [[InlineKeyboardButton("📥 DESCARGAS", callback_data="downloads", style="success")]]
+
+    app_button = InlineKeyboardButton(
+        "📱 VINCULAR APLICACIÓN", callback_data="app:pair", style="success"
+    )
+    has_premium_tools = (
+        user_id is not None and (is_owner(user_id) or get_user_plan(user_id) == "premium")
+    )
+    if has_premium_tools:
+        rows.append([
+            app_button,
+            InlineKeyboardButton(
+                "🛠️ HERRAMIENTAS PREMIUM", callback_data="premium:tools", style="success"
+            ),
+        ])
+    else:
+        rows.append([app_button])
+
+    rows.extend([
         [InlineKeyboardButton(
             f"💰 SALDO: {get_user_balance(user_id) if user_id is not None else 0}$ · REFERIDOS",
-            callback_data="balance",
-            style="primary",
+            callback_data="balance", style="primary",
         )],
-        [InlineKeyboardButton("❓ AYUDA", callback_data="help:0", style="primary"),
-         InlineKeyboardButton("📒 HISTORIAL", callback_data="open_history", style="primary")],
         [InlineKeyboardButton("📋 COLA", callback_data="open_queue", style="primary"),
-         InlineKeyboardButton("💬 SOPORTE", callback_data="support", style="primary")],
+         InlineKeyboardButton("📒 HISTORIAL", callback_data="open_history", style="primary")],
         [InlineKeyboardButton("📊 MI CUOTA", callback_data="my_quota", style="primary"),
          InlineKeyboardButton("🏆 TOP USUARIOS", callback_data="top:users", style="primary")],
-        [InlineKeyboardButton("ℹ️ SERVICIO TODUS S3", callback_data="service_info", style="primary")],
-    ]
-    if user_id is not None and (is_owner(user_id) or get_user_plan(user_id) == "premium"):
-        rows.insert(1, [InlineKeyboardButton("🛠️ HERRAMIENTAS PREMIUM", callback_data="premium:tools", style="success")])
+        [InlineKeyboardButton("❓ AYUDA", callback_data="help:0", style="primary"),
+         InlineKeyboardButton("💬 SOPORTE", callback_data="support", style="primary")],
+    ])
+
+    service_button = InlineKeyboardButton(
+        "ℹ️ SERVICIO TODUS S3", callback_data="service_info", style="primary"
+    )
     if user_id is not None and is_admin(user_id):
-        rows.append([InlineKeyboardButton("⚙️ PANEL DE CREADOR", callback_data="admin:open", style="primary")])
+        rows.append([
+            service_button,
+            InlineKeyboardButton(
+                "⚙️ PANEL DE CREADOR", callback_data="admin:open", style="primary"
+            ),
+        ])
+    else:
+        rows.append([service_button])
     return InlineKeyboardMarkup(rows)
 
 
@@ -4867,7 +4892,11 @@ def welcome_text(user_id: int, user_name: str, username: str | None = None) -> s
 
 async def send_welcome_message(message, user_id: int, user_name: str, username: str | None,
                                reply_markup: InlineKeyboardMarkup, extra_text: str = "") -> None:
-    """Muestra solo la imagen de marca con los botones del bot."""
+    """Muestra la animación de marca con los botones del bot."""
+    if WELCOME_ANIMATION_PATH.is_file() and hasattr(message, "reply_animation"):
+        with WELCOME_ANIMATION_PATH.open("rb") as animation:
+            await message.reply_animation(animation=animation, reply_markup=reply_markup)
+        return
     if WELCOME_IMAGE_PATH.is_file() and hasattr(message, "reply_photo"):
         with WELCOME_IMAGE_PATH.open("rb") as photo:
             await message.reply_photo(photo=photo, reply_markup=reply_markup)
@@ -4880,8 +4909,28 @@ async def send_welcome_message(message, user_id: int, user_name: str, username: 
 
 async def edit_welcome_message(message, user_id: int, user_name: str, username: str | None,
                                reply_markup: InlineKeyboardMarkup, extra_text: str = "") -> None:
-    """Cambia la pantalla de verificación por la imagen de marca sin texto."""
+    """Cambia la pantalla de verificación por la animación de marca sin texto."""
     caption = welcome_text(user_id, user_name, username) + extra_text
+    if WELCOME_ANIMATION_PATH.is_file():
+        is_media_message = bool(
+            getattr(message, "photo", None) or getattr(message, "animation", None)
+        )
+        if is_media_message and hasattr(message, "edit_media"):
+            with WELCOME_ANIMATION_PATH.open("rb") as animation:
+                await message.edit_media(
+                    media=InputMediaAnimation(media=animation),
+                    reply_markup=reply_markup,
+                )
+            return
+        if hasattr(message, "reply_animation"):
+            with WELCOME_ANIMATION_PATH.open("rb") as animation:
+                await message.reply_animation(animation=animation, reply_markup=reply_markup)
+            if hasattr(message, "delete"):
+                try:
+                    await message.delete()
+                except Exception:
+                    pass
+            return
     if WELCOME_IMAGE_PATH.is_file() and getattr(message, "photo", None) and hasattr(message, "edit_media"):
         with WELCOME_IMAGE_PATH.open("rb") as photo:
             await message.edit_media(
@@ -4903,18 +4952,10 @@ async def edit_welcome_message(message, user_id: int, user_name: str, username: 
 
 async def send_service_info_message(message, user_id: int, user_name: str,
                                     username: str | None) -> None:
-    """Muestra solo la imagen de marca y conserva los botones."""
-    markup = main_keyboard(user_id)
-    if WELCOME_IMAGE_PATH.is_file() and hasattr(message, "reply_photo"):
-        with WELCOME_IMAGE_PATH.open("rb") as photo:
-            await message.reply_photo(photo=photo, reply_markup=markup)
-        if hasattr(message, "delete"):
-            try:
-                await message.delete()
-            except Exception:
-                pass
-        return
-    await message.edit_text(welcome_text(user_id, user_name, username), reply_markup=markup)
+    """Muestra la animación de marca y conserva los botones."""
+    await edit_welcome_message(
+        message, user_id, user_name, username, main_keyboard(user_id)
+    )
 
 
 async def edit_query_message_text(message, text: str, **kwargs):
@@ -8499,6 +8540,9 @@ async def mark_unfinished_tasks_interrupted(application: Application) -> int:
 
 
 async def post_shutdown(application: Application) -> None:
+    from web_store import configure_app_task_bridge
+
+    configure_app_task_bridge(None)
     expiration_task = application.bot_data.get("cloud_expiration_task")
     if expiration_task:
         expiration_task.cancel()

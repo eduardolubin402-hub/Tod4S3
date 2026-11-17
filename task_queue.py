@@ -7,6 +7,9 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from typing import Any
 
+PRIORITY_AGING_INTERVAL_SECONDS = 60
+MAX_BASE_PRIORITY = 3
+
 
 @dataclass
 class TransferTask:
@@ -46,7 +49,7 @@ class TransferTask:
 
 
 class FairTaskQueue:
-    """Colas FIFO privadas por usuario con rotación justa entre usuarios."""
+    """Colas FIFO por usuario, con prioridad VIP y envejecimiento contra inanición."""
 
     def __init__(self) -> None:
         self.jobs: dict[str, TransferTask] = {}
@@ -78,10 +81,21 @@ class FairTaskQueue:
             async with self.lock:
                 while self.rotation:
                     rotation = list(self.rotation)
-                    highest_priority = max(self.user_priorities.get(uid, 0) for uid in rotation)
+                    now = time.time()
+
+                    def effective_priority(user_id: int) -> int:
+                        queue = self.queues.get(user_id)
+                        job = self.jobs.get(queue[0]) if queue else None
+                        if job is None:
+                            return self.user_priorities.get(user_id, 0)
+                        waited = max(0, int((now - job.created_at) // PRIORITY_AGING_INTERVAL_SECONDS))
+                        base_priority = min(MAX_BASE_PRIORITY, max(0, int(job.priority or 0)))
+                        return base_priority + waited
+
+                    highest_priority = max(effective_priority(uid) for uid in rotation)
                     selected_index = next(
                         index for index, uid in enumerate(rotation)
-                        if self.user_priorities.get(uid, 0) == highest_priority
+                        if effective_priority(uid) == highest_priority
                     )
                     user_id = rotation.pop(selected_index)
                     self.rotation = deque(rotation)

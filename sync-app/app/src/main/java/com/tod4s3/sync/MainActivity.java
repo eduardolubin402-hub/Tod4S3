@@ -807,8 +807,9 @@ public final class MainActivity extends Activity {
             dialogWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
             dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
             WindowManager.LayoutParams windowParams = dialogWindow.getAttributes();
-            windowParams.width = Math.min(getResources().getDisplayMetrics().widthPixels - dp(40), dp(380));
+            windowParams.width = WindowManager.LayoutParams.MATCH_PARENT;
             windowParams.height = WindowManager.LayoutParams.WRAP_CONTENT;
+            windowParams.gravity = Gravity.BOTTOM;
             windowParams.dimAmount = 0.72f;
             dialogWindow.setAttributes(windowParams);
         }
@@ -2270,16 +2271,37 @@ public final class MainActivity extends Activity {
     private LinearLayout dashboardTabs() {
         LinearLayout tabs = new LinearLayout(this);
         tabs.setOrientation(LinearLayout.HORIZONTAL);
-        addIconTab(tabs, "Todo", R.drawable.ic_inbox_delivery,
-                "all".equals(dashboardFilter), () -> showDashboard("all", true), 1f);
-        addIconTab(tabs, "Descargas activas", R.drawable.ic_active_download,
-                "active".equals(dashboardFilter), () -> showDashboard("active", true), 1f);
-        addIconTab(tabs, "Completadas", R.drawable.ic_completed_check,
-                "completed".equals(dashboardFilter), () -> showDashboard("completed", true), 1f);
-        // AiTod4S3 permanece visible como en el mockup; el acceso se valida al abrirlo.
-        addIconTab(tabs, "AiTod4S3", R.drawable.ic_ai_sparkle, showingAiChat,
-                () -> showAiChat(true), 1f);
+        addTextTab(tabs, "Entregas", "all".equals(dashboardFilter) || "active".equals(dashboardFilter),
+                () -> showDashboard("all", true), 1f);
+        addTextTab(tabs, "Descargas", "completed".equals(dashboardFilter),
+                () -> showDashboard("completed", true), 1f);
         return tabs;
+    }
+
+    private void addTextTab(LinearLayout parent, String label, boolean selected,
+                            Runnable action, float weight) {
+        TextView item = text(label, 12, true);
+        item.setGravity(Gravity.CENTER);
+        item.setBackground(roundRect(selected ? accentColor() : raisedSurfaceColor(), 18,
+                selected ? accentColor() : borderColor()));
+        item.setTextColor(selected ? onAccentColor() : secondaryTextColor());
+        item.setClickable(true);
+        item.setFocusable(true);
+        item.setContentDescription(label);
+        item.setOnClickListener(v -> action.run());
+        item.setOnTouchListener((view, event) -> {
+            if (!uiAnimationsEnabled()) return false;
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                view.animate().scaleX(0.97f).scaleY(0.97f).setDuration(75L).start();
+            } else if (event.getAction() == MotionEvent.ACTION_UP
+                    || event.getAction() == MotionEvent.ACTION_CANCEL) {
+                view.animate().scaleX(1f).scaleY(1f).setDuration(115L).start();
+            }
+            return false;
+        });
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(44), weight);
+        params.setMargins(dp(4), dp(1), dp(4), dp(3));
+        parent.addView(item, params);
     }
 
     private void addIconTab(LinearLayout parent, String description, int iconResource,
@@ -2376,6 +2398,26 @@ public final class MainActivity extends Activity {
         balanceLayout.setMargins(0, 0, dp(20), dp(98));
         appRoot.addView(balance, balanceLayout);
         dashboardBalanceFab = balance;
+
+        FrameLayout ai = new FrameLayout(this);
+        GradientDrawable aiCircle = new GradientDrawable();
+        aiCircle.setShape(GradientDrawable.OVAL);
+        aiCircle.setColor(Color.rgb(242, 30, 58));
+        aiCircle.setStroke(dp(2), isDarkTheme() ? Color.rgb(67, 76, 96) : Color.WHITE);
+        ai.setBackground(aiCircle);
+        ai.setElevation(dp(12));
+        ai.setClickable(true);
+        ai.setFocusable(true);
+        TextView aiLabel = text("IA", 15, true);
+        aiLabel.setTextColor(Color.WHITE);
+        aiLabel.setGravity(Gravity.CENTER);
+        ai.addView(aiLabel, new FrameLayout.LayoutParams(dp(54), dp(54), Gravity.CENTER));
+        ai.setContentDescription("Abrir AiTod4S3");
+        ai.setOnClickListener(v -> showAiChat(true));
+        FrameLayout.LayoutParams aiLayout = new FrameLayout.LayoutParams(dp(54), dp(54), Gravity.BOTTOM | Gravity.END);
+        aiLayout.setMargins(0, 0, dp(20), dp(24));
+        appRoot.addView(ai, aiLayout);
+        dashboardFab = ai;
     }
 
     private void requestToDusBalance() {
@@ -3325,9 +3367,13 @@ public final class MainActivity extends Activity {
         addDrawerSectionHeader(content, "Planes y archivos");
         addDrawerRow(content, popup, "★", "Planes y ofertas", "Ver opciones y precios", () -> showPlansStep(true));
         addDrawerRow(content, popup, "▣", "Archivos de ToDus", "Entregas del bot", () -> showDashboard("all", true));
+        addDrawerRow(content, popup, "⌁", "Vaciar mi nube", "Eliminar entregas remotas", () ->
+                Toast.makeText(this, "Selecciona “Eliminar nube” en cada entrega para confirmar la eliminación.", Toast.LENGTH_LONG).show());
         addDrawerRow(content, popup, "↓", "Descargas", "Archivos guardados en el teléfono", () -> showDashboard("completed", true));
 
         addDrawerSectionHeader(content, "Actividad");
+        addDrawerRow(content, popup, "◷", "Historial de transferencias", "Entregas y descargas anteriores", () -> showDashboard("completed", true));
+        addDrawerRow(content, popup, "ϟ", "Velocidad de red en pantalla", "Mostrar u ocultar el indicador", () -> showSettings(true));
         addDrawerRow(content, popup, "▥", "Estadísticas", "Uso y actividad", () -> showStats(true));
         if (token != null && !token.isEmpty()) {
             addDrawerRow(content, popup, "▤", "Registros de la app", "Consultar actividad y errores", () -> showAppLogs(true));

@@ -146,9 +146,8 @@ PUBLIC_CHANNEL_ID = (
     or os.getenv("REQUIRED_TODUS_CHANNEL", "").strip()
     or "@darzPrbo"
 )
-_LEGACY_PUBLIC_SITE_URL = "https://tod4s3-production.up.railway.app"
-_CURRENT_PUBLIC_SITE_URL = "https://tod4s3-production-9207.up.railway.app"
-ANDROID_UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/tipinicol-ai/Tod4S3/main/web/android-update.json"
+_CURRENT_PUBLIC_SITE_URL = "https://tod4s3-production-abe8925f.up.railway.app"
+ANDROID_UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/web/android-update.json"
 ANDROID_RELEASE_CACHE_SECONDS = 300
 PUBLIC_SITE_URL = os.getenv("PUBLIC_SITE_URL", "").strip().rstrip("/")
 if not PUBLIC_SITE_URL:
@@ -3488,7 +3487,7 @@ def help_keyboard(page: int) -> InlineKeyboardMarkup:
     rows = [row]
     if page == len(HELP_PAGES) - 1:
         rows.append([
-            btn("🌐 ᴡᴇʙ ᴅᴇ ᴘʟᴀɴᴇꜱ", url="https://tod4s3-production-9207.up.railway.app/#inicio"),
+            btn("🌐 ᴡᴇʙ ᴅᴇ ᴘʟᴀɴᴇꜱ", url="https://tod4s3-production-abe8925f.up.railway.app/#inicio"),
             btn("💬 ᴄᴏɴᴛᴀᴄᴛᴀʀ ᴀᴅᴍɪɴ", url="https://t.me/Niku_Blade"),
         ])
     rows.append([btn("🏠 ɪɴɪᴄɪᴏ", callback_data="home")])
@@ -5346,7 +5345,7 @@ def validate_android_update_manifest(manifest: object) -> dict[str, object]:
         parsed.scheme != "https"
         or parsed.hostname != "raw.githubusercontent.com"
         or parsed.username or parsed.password
-        or not parsed.path.startswith("/tipinicol-ai/Tod4S3/main/")
+        or not parsed.path.startswith("/eduardolubin402-hub/Tod4S3/main/")
         or Path(parsed.path).name != expected_filename
         or parsed.query or parsed.fragment
     ):

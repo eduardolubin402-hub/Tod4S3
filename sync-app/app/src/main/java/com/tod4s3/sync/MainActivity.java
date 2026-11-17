@@ -54,6 +54,7 @@ import android.widget.ImageView;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
+import android.widget.HorizontalScrollView;
 import android.widget.Switch;
 import android.widget.PopupWindow;
 import android.widget.SeekBar;
@@ -4243,6 +4244,31 @@ public final class MainActivity extends Activity {
         aiChatStatus.setPadding(dp(10), dp(6), dp(10), dp(6));
         aiChatStatus.setBackground(roundRect(Color.rgb(19, 22, 21), 16, Color.rgb(57, 62, 58)));
         page.addView(aiChatStatus, margin(2, 2, 2, 7));
+
+        LinearLayout aiTopics = new LinearLayout(this);
+        aiTopics.setOrientation(LinearLayout.HORIZONTAL);
+        String[] topicLabels = {"Actualización", "Instalación", "Descargas", "Registro", "Errores comunes"};
+        for (String topic : topicLabels) {
+            TextView chip = text(topic, 10, true);
+            chip.setGravity(Gravity.CENTER);
+            chip.setSingleLine(true);
+            chip.setPadding(dp(8), dp(5), dp(8), dp(5));
+            chip.setTextColor(Color.rgb(227, 188, 202));
+            chip.setBackground(roundRect(Color.rgb(42, 24, 34), 15, Color.rgb(112, 54, 77)));
+            chip.setOnClickListener(v -> {
+                if (aiComposer != null) {
+                    aiComposer.setText("Ayúdame con " + ((TextView) v).getText().toString().toLowerCase(java.util.Locale.ROOT));
+                    aiComposer.setSelection(aiComposer.length());
+                }
+            });
+            LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(0, dp(34), 1f);
+            chipParams.setMargins(dp(2), 0, dp(2), 0);
+            aiTopics.addView(chip, chipParams);
+        }
+        HorizontalScrollView topicsScroll = new HorizontalScrollView(this);
+        topicsScroll.setHorizontalScrollBarEnabled(false);
+        topicsScroll.addView(aiTopics, new HorizontalScrollView.LayoutParams(-2, -2));
+        page.addView(topicsScroll, margin(0, 0, 0, 7));
 
         aiActivityPanel = new LinearLayout(this);
         aiActivityPanel.setOrientation(LinearLayout.HORIZONTAL);

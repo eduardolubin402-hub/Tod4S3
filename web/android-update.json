@@ -1,7 +1,8 @@
 {
-  "version_code": 98,
-  "version_name": "1.5.53",
+  "version_code": 99,
+  "version_name": "1.5.54",
   "manifest_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/web/android-update.json",
-  "apk_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/Tod4S3-Sync-v1.5.53.apk",
-  "sha256": "6901e19e68ba527c832945b1e48e2939b07356c2d8506c1307718f8cdf278d8e"
+  "apk_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/Tod4S3-Sync-v1.5.54.apk",
+  "sha256": "2f82eb176134178288e1945f5e1bf4a1b4ae4758ca2c57f05b5b903ac196038f",
+  "release_notes": "Detalles visuales de Premium, vinculación, AiTod4S3 y tareas activas."
 }

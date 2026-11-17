@@ -14,6 +14,7 @@ from pathlib import Path
 from threading import BoundedSemaphore, Lock, Thread
 from typing import Callable
 from urllib.parse import parse_qs, unquote, urlsplit
+from app_config import public_site_origin
 import sync_api
 import todus_s3_storage
 from sync_api import consume_pairing_code, deliveries_for_token, revoke_token
@@ -26,7 +27,7 @@ _VISITOR_LAST_SEEN: dict[str, float] = {}
 _TOTAL_VISITS = 0
 _MAX_VISITORS = 5000
 _VISITOR_RE = re.compile(r"^[A-Za-z0-9-]{8,96}$")
-_DEFAULT_ORIGIN = "https://tod4s3-production-abe8925f.up.railway.app"
+_DEFAULT_ORIGIN = public_site_origin()
 _PROFILE_CHECKER: Callable[[int], dict] | None = None
 _PROFILE_PHOTO_CHECKER: Callable[[int], bytes | None] | None = None
 _APP_TASK_BRIDGE: Callable[[str, int, dict], tuple[dict, int]] | None = None

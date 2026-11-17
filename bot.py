@@ -80,6 +80,7 @@ from premium_tools import (
     extract_embedded_subtitles,
     join_videos,
 )
+from app_config import ANDROID_UPDATE_MANIFEST_URL, public_site_url
 import sync_api
 
 load_dotenv()
@@ -146,15 +147,8 @@ PUBLIC_CHANNEL_ID = (
     or os.getenv("REQUIRED_TODUS_CHANNEL", "").strip()
     or "@darzPrbo"
 )
-_CURRENT_PUBLIC_SITE_URL = "https://tod4s3-production-abe8925f.up.railway.app"
-ANDROID_UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/web/android-update.json"
 ANDROID_RELEASE_CACHE_SECONDS = 300
-PUBLIC_SITE_URL = os.getenv("PUBLIC_SITE_URL", "").strip().rstrip("/")
-if not PUBLIC_SITE_URL:
-    railway_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "").strip().strip("/")
-    PUBLIC_SITE_URL = f"https://{railway_domain}" if railway_domain else f"{_CURRENT_PUBLIC_SITE_URL}/#inicio"
-if PUBLIC_SITE_URL.startswith(_LEGACY_PUBLIC_SITE_URL):
-    PUBLIC_SITE_URL = _CURRENT_PUBLIC_SITE_URL + PUBLIC_SITE_URL[len(_LEGACY_PUBLIC_SITE_URL):]
+PUBLIC_SITE_URL = public_site_url()
 # Horas que los archivos permanecen en la nube de ToDus antes del borrado
 # automático. 0 = los archivos nunca se borran solos; solo se eliminan
 # cuando el usuario o un admin lo piden explícitamente.
@@ -3487,7 +3481,7 @@ def help_keyboard(page: int) -> InlineKeyboardMarkup:
     rows = [row]
     if page == len(HELP_PAGES) - 1:
         rows.append([
-            btn("🌐 ᴡᴇʙ ᴅᴇ ᴘʟᴀɴᴇꜱ", url="https://tod4s3-production-abe8925f.up.railway.app/#inicio"),
+            btn("🌐 ᴡᴇʙ ᴅᴇ ᴘʟᴀɴᴇꜱ", url=PUBLIC_SITE_URL),
             btn("💬 ᴄᴏɴᴛᴀᴄᴛᴀʀ ᴀᴅᴍɪɴ", url="https://t.me/Niku_Blade"),
         ])
     rows.append([btn("🏠 ɪɴɪᴄɪᴏ", callback_data="home")])

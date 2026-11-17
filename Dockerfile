@@ -10,8 +10,8 @@ RUN apt-get update \
     && pip install --no-cache-dir -r requirements.txt \
     && useradd --create-home --uid 10001 botuser \
     && mkdir -p /data \
-    && chown botuser:botuser /data
-COPY --chown=botuser:botuser bot.py task_queue.py premium_tools.py todus_s3_storage.py platform_downloads.py telegram_backup.py sync_api.py web_store.py toduss3_welcome_option_1.png IMG_20261102_161854_801.jpg .
+&& chown botuser:botuser /data
+COPY --chown=botuser:botuser app_config.py bot.py task_queue.py premium_tools.py todus_s3_storage.py platform_downloads.py telegram_backup.py sync_api.py web_store.py toduss3_welcome_option_1.png IMG_20261102_161854_801.jpg .
 COPY --chown=botuser:botuser web ./web
 USER botuser
 CMD ["python", "bot.py"]

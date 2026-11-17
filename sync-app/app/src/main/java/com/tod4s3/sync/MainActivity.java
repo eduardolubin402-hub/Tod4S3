@@ -36,6 +36,7 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.view.animation.DecelerateInterpolator;
 import android.view.inputmethod.EditorInfo;
+import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.text.SpannableString;
@@ -2682,6 +2683,10 @@ public final class MainActivity extends Activity {
         if (toDusTab) addToDusSessionStatus(dashboardItemsBox);
         shown += renderToDusDownloadTasks();
         if (!toDusTab) {
+            // Las descargas locales se conservan en memoria y en preferencias;
+            // deben aparecer tanto al iniciar una descarga como al volver a
+            // abrir la pestaña Descargas, incluso antes de terminar.
+            shown += renderDirectLinkTasks();
             ArrayList<JSONObject> tasks = new ArrayList<>();
             for (int i = 0; i < latestAppTaskRows.length(); i++) {
                 JSONObject row = latestAppTaskRows.optJSONObject(i);
@@ -2691,7 +2696,8 @@ public final class MainActivity extends Activity {
                         || state.equals("uploading") || state.equals("cancelling");
                 boolean done = state.equals("done") || state.equals("error") || state.equals("paused");
                 if ("active".equals(dashboardFilter) && !active) continue;
-                if ("completed".equals(dashboardFilter) && !done) continue;
+                // En Descargas se muestran activas y completadas; el filtro
+                // "active" sigue siendo exclusivo para la vista de progreso.
                 String searchText = (row.optString("filename", "") + " " + row.optString("task_id", ""))
                         .toLowerCase(java.util.Locale.ROOT);
                 if (!dashboardSearch.isEmpty() && !searchText.contains(dashboardSearch.toLowerCase(java.util.Locale.ROOT))) continue;
@@ -2730,7 +2736,7 @@ public final class MainActivity extends Activity {
     }
 
     private int renderToDusDownloadTasks() {
-        if ("all".equals(dashboardFilter) || "completed".equals(dashboardFilter)) return 0;
+        if ("all".equals(dashboardFilter)) return 0;
         ArrayList<ToDusDownloadTask> tasks;
         synchronized (toDusDownloadLock) {
             tasks = new ArrayList<>(toDusDownloadTasks.values());
@@ -3395,7 +3401,7 @@ public final class MainActivity extends Activity {
     private void showNavigationDrawer(View anchor) {
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(12), dp(12), dp(12), dp(12));
+        content.setPadding(dp(12), dp(12), dp(12), dp(26));
         content.setBackground(roundRect(surfaceColor(), 24, borderColor()));
         LinearLayout account = new LinearLayout(this);
         account.setGravity(Gravity.CENTER_VERTICAL);
@@ -3427,16 +3433,20 @@ public final class MainActivity extends Activity {
         account.addView(accountAction, new LinearLayout.LayoutParams(dp(34), dp(38)));
         content.addView(account, margin(0, 0, 0, 9));
 
-        int appWindowHeight = appRoot == null ? 0 : appRoot.getHeight();
+        Rect visibleFrame = new Rect();
+        if (appRoot != null) appRoot.getWindowVisibleDisplayFrame(visibleFrame);
+        int appWindowHeight = visibleFrame.height();
+        if (appWindowHeight <= 0) appWindowHeight = appRoot == null ? 0 : appRoot.getHeight();
         if (appWindowHeight <= 0) appWindowHeight = getResources().getDisplayMetrics().heightPixels;
-        final int drawerHeight = Math.max(dp(320), appWindowHeight - dp(28));
+        final int drawerHeight = Math.max(dp(320), appWindowHeight - dp(16));
         ScrollView drawerScroll = new ScrollView(this);
         drawerScroll.setFillViewport(true);
         drawerScroll.setSmoothScrollingEnabled(true);
         drawerScroll.setNestedScrollingEnabled(true);
         drawerScroll.setFocusable(true);
         drawerScroll.setClickable(true);
-        drawerScroll.setVerticalScrollBarEnabled(false);
+        drawerScroll.setVerticalScrollBarEnabled(true);
+        drawerScroll.setScrollbarFadingEnabled(false);
         drawerScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
         drawerScroll.setBackgroundColor(Color.TRANSPARENT);
         drawerScroll.addView(content, new ScrollView.LayoutParams(-1, -2));
@@ -3444,6 +3454,7 @@ public final class MainActivity extends Activity {
         PopupWindow popup = new PopupWindow(drawerScroll, drawerWidth, drawerHeight, true);
         popup.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         popup.setOutsideTouchable(true);
+        popup.setClippingEnabled(false);
         popup.setElevation(dp(18));
         if (token == null || token.isEmpty()) {
             account.setOnClickListener(v -> {
@@ -3510,15 +3521,17 @@ public final class MainActivity extends Activity {
         boolean active = ("Planes y ofertas".equals(title) && showingPlansPage)
                 || ("Archivos de ToDus".equals(title) && viewingDashboard && !"completed".equals(dashboardFilter))
                 || ("Descargas".equals(title) && viewingDashboard && "completed".equals(dashboardFilter));
-        row.setBackground(roundRect(active ? Color.rgb(55, 22, 31) : raisedSurfaceColor(), 13,
-                active ? Color.rgb(242, 30, 58) : borderColor()));
+        boolean logout = "Cerrar sesión".equals(title);
+        row.setBackground(roundRect(logout ? Color.rgb(35, 12, 22)
+                        : (active ? Color.rgb(55, 22, 31) : raisedSurfaceColor()), 13,
+                logout || active ? Color.rgb(242, 30, 58) : borderColor()));
         row.setElevation(dp(1));
         row.setContentDescription(title + ". " + subtitle);
         TextView glyph = text(icon, 16, true);
         glyph.setGravity(Gravity.CENTER);
-        glyph.setTextColor(accentColor());
-        glyph.setBackground(roundRect(active ? Color.rgb(111, 28, 45) : Color.rgb(34, 27, 38), 12,
-                active ? Color.rgb(242, 30, 58) : Color.TRANSPARENT));
+        glyph.setTextColor(logout ? Color.rgb(255, 102, 123) : accentColor());
+        glyph.setBackground(roundRect(logout || active ? Color.rgb(111, 28, 45) : Color.rgb(34, 27, 38), 12,
+                logout || active ? Color.rgb(242, 30, 58) : Color.TRANSPARENT));
         row.addView(glyph, new LinearLayout.LayoutParams(dp(32), dp(32)));
         TextView label = text(title, 12, true);
         label.setSingleLine(true);

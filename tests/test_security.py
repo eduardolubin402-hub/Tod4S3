@@ -150,6 +150,7 @@ class TelegramCommandTests(unittest.IsolatedAsyncioTestCase):
         mtproto_records = [record for record in captured.records if "MTProto opcional" in record.getMessage()]
         self.assertEqual(len(mtproto_records), 1)
         self.assertEqual(mtproto_records[0].levelno, logging.INFO)
+        await post_shutdown(application)
 
     async def test_startup_with_mtproto_credentials_starts_and_closes_client(self):
         client = SimpleNamespace(

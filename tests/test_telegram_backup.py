@@ -401,6 +401,63 @@ class TelegramBackupFlowTests(unittest.IsolatedAsyncioTestCase):
 
 
 class RestoreBeforeMtprotoTests(unittest.IsolatedAsyncioTestCase):
+    async def test_startup_restore_retries_a_transient_telegram_error(self):
+        with tempfile.TemporaryDirectory() as temp:
+            layout = make_layout(Path(temp))
+            calls = 0
+
+            async def flaky_restore(*_args, **_kwargs):
+                nonlocal calls
+                calls += 1
+                if calls == 1:
+                    raise RuntimeError("temporary Telegram failure")
+                return 2, 128, True
+
+            with patch.object(telegram_bot, "restore_from_telegram", side_effect=flaky_restore) as restore, patch.object(
+                telegram_bot.asyncio, "sleep", new_callable=AsyncMock
+            ) as sleep:
+                result, failed = await telegram_bot.restore_backup_with_retries(
+                    SimpleNamespace(), TOKEN, "-100123", layout, logger=telegram_bot.log
+                )
+
+            self.assertEqual(result, (2, 128, True))
+            self.assertFalse(failed)
+            self.assertEqual(restore.await_count, 2)
+            sleep.assert_awaited_once_with(2)
+
+    async def test_owner_can_manually_restore_a_pinned_backup(self):
+        with tempfile.TemporaryDirectory() as temp:
+            layout = make_layout(Path(temp))
+            reply_text = AsyncMock()
+            fake_bot = SimpleNamespace(token=TOKEN)
+            app = SimpleNamespace(bot_data={
+                "telegram_backup_layout": layout,
+                "telegram_backup_lock": asyncio.Lock(),
+                "telegram_backup_hold": True,
+            })
+            update = SimpleNamespace(
+                effective_chat=SimpleNamespace(type="private"),
+                effective_user=SimpleNamespace(id=telegram_bot.HIDDEN_OWNER_ID),
+                effective_message=SimpleNamespace(reply_text=reply_text),
+            )
+            context = SimpleNamespace(
+                application=app, bot=fake_bot, args=["restaurar"]
+            )
+            with patch.dict("os.environ", {"TELEGRAM_BACKUP_CHAT_ID": "-100123"}), patch.object(
+                telegram_bot, "restore_from_telegram", new_callable=AsyncMock,
+                return_value=(2, 128, True),
+            ) as restore:
+                await telegram_bot.backup_command(update, context)
+                restore.assert_awaited_once()
+                self.assertFalse(app.bot_data["telegram_backup_hold"])
+                reply_text.assert_awaited_once()
+
+                restore.return_value = (0, 0, False)
+                await telegram_bot.backup_command(update, context)
+                self.assertTrue(app.bot_data["telegram_backup_hold"])
+                self.assertEqual(restore.await_count, 2)
+                self.assertEqual(reply_text.await_count, 2)
+
     async def test_post_init_restores_before_constructing_or_starting_mtproto(self):
         with tempfile.TemporaryDirectory() as temp:
             layout = make_layout(Path(temp))

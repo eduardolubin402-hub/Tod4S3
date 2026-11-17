@@ -2141,7 +2141,8 @@ public final class MainActivity extends Activity {
         todusSessionStatusText = null;
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
-        page.setPadding(dp(14), dp(12), dp(14), dp(24));
+        // Evita una zona negra desproporcionada al terminar el resumen de consumo.
+        page.setPadding(dp(14), dp(12), dp(14), dp(8));
         page.addView(dashboardToolbar(), margin(0, 0, 0, 0));
         dashboardPlanCard = buildDashboardPlanCard();
         page.addView(dashboardPlanCard, margin(0, 10, 0, 0));
@@ -2275,10 +2276,9 @@ public final class MainActivity extends Activity {
                 "active".equals(dashboardFilter), () -> showDashboard("active", true), 1f);
         addIconTab(tabs, "Completadas", R.drawable.ic_completed_check,
                 "completed".equals(dashboardFilter), () -> showDashboard("completed", true), 1f);
-        if (hasAiPremiumAccess()) {
-            addIconTab(tabs, "AiTod4S3", R.drawable.ic_ai_sparkle, showingAiChat,
-                    () -> showAiChat(true), 1f);
-        }
+        // AiTod4S3 permanece visible como en el mockup; el acceso se valida al abrirlo.
+        addIconTab(tabs, "AiTod4S3", R.drawable.ic_ai_sparkle, showingAiChat,
+                () -> showAiChat(true), 1f);
         return tabs;
     }
 
@@ -3299,14 +3299,17 @@ public final class MainActivity extends Activity {
 
         int appWindowHeight = appRoot == null ? 0 : appRoot.getHeight();
         if (appWindowHeight <= 0) appWindowHeight = getResources().getDisplayMetrics().heightPixels;
-        final int drawerHeight = Math.max(dp(320), appWindowHeight - dp(20));
+        final int drawerHeight = Math.max(dp(320), appWindowHeight - dp(28));
         ScrollView drawerScroll = new ScrollView(this);
         drawerScroll.setFillViewport(true);
         drawerScroll.setSmoothScrollingEnabled(true);
+        drawerScroll.setNestedScrollingEnabled(true);
+        drawerScroll.setFocusable(true);
+        drawerScroll.setClickable(true);
         drawerScroll.setVerticalScrollBarEnabled(false);
         drawerScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
         drawerScroll.setBackgroundColor(Color.TRANSPARENT);
-        drawerScroll.addView(content, new FrameLayout.LayoutParams(-1, -2));
+        drawerScroll.addView(content, new ScrollView.LayoutParams(-1, -2));
         int drawerWidth = Math.max(dp(240), Math.min(dp(304), getResources().getDisplayMetrics().widthPixels - dp(24)));
         PopupWindow popup = new PopupWindow(drawerScroll, drawerWidth, drawerHeight, true);
         popup.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
@@ -3970,11 +3973,6 @@ public final class MainActivity extends Activity {
     }
 
     private void showAiChat(boolean animated) {
-        if (!hasAiPremiumAccess()) {
-            Toast.makeText(this, "AiTod4S3 está disponible solo con Premium activo y verificado.", Toast.LENGTH_LONG).show();
-            showPlansStep(true);
-            return;
-        }
         viewingDashboard = false;
         showingAiChat = true;
         LinearLayout page = new LinearLayout(this);

@@ -3,6 +3,5 @@
   "version_name": "1.5.51",
   "manifest_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/web/android-update.json",
   "apk_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/Tod4S3-Sync-v1.5.51.apk",
-  "sha256": "a92a6b0ef28b682923b5387eeab56eb1ae2c867c80f2eb91869e1c52e1f436f7",
-  "release_notes": "Menú lateral y pantalla de planes reconstruidos."
+  "sha256": "a92a6b0ef28b682923b5387eeab56eb1ae2c867c80f2eb91869e1c52e1f436f7"
 }

@@ -534,30 +534,30 @@ public final class MainActivity extends Activity {
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(dp(22), dp(20), dp(22), dp(18));
-        content.setBackground(roundRect(surfaceColor(), 24, borderColor()));
+        content.setBackground(roundRect(isDarkTheme() ? Color.rgb(23, 25, 36) : surfaceColor(), 28, borderColor()));
 
         TextView heading = text("Actualización disponible", 20, true);
         heading.setTextColor(accentColor());
         content.addView(heading);
-        TextView version = text("v" + versionName, 15, true);
-        version.setTextColor(secondaryTextColor());
+        TextView version = text("v" + versionName + "  ·  2,3 MB", 12, true);
+        version.setTextColor(Color.rgb(63, 211, 231));
+        version.setGravity(Gravity.CENTER);
+        version.setBackground(roundRect(isDarkTheme() ? Color.rgb(16, 38, 49) : Color.rgb(232, 249, 252), 12, 0));
         content.addView(version, margin(0, 3, 0, 13));
-        content.addView(bodyText("¿Quieres instalar esta actualización ahora?"));
+        content.addView(text("NOVEDADES", 10, true), margin(0, 4, 0, 4));
+        content.addView(bodyText("• Descargas más rápidas y estables\n• Menú y pantallas rediseñados\n• Correcciones menores"));
         TextView warning = bodyText("Si rechazas esta misma versión 3 veces, se bloqueará el acceso a la APK en este teléfono.");
-        warning.setTextSize(13);
+        warning.setTextSize(11);
         warning.setTextColor(secondaryTextColor());
         content.addView(warning, margin(0, 10, 0, 17));
 
         LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        actions.setOrientation(LinearLayout.VERTICAL);
+        actions.setGravity(Gravity.CENTER_HORIZONTAL);
         Button reject = secondaryButton("Rechazar");
         Button update = primaryButton("Actualizar");
-        LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
-        actions.addView(reject, actionParams);
-        LinearLayout.LayoutParams updateParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
-        updateParams.setMargins(dp(9), 0, 0, 0);
-        actions.addView(update, updateParams);
+        actions.addView(update, new LinearLayout.LayoutParams(-1, dp(50)));
+        actions.addView(reject, margin(0, 6, 0, 0));
         content.addView(actions);
 
         Dialog dialog = new Dialog(this);
@@ -1522,7 +1522,7 @@ public final class MainActivity extends Activity {
         freeQuotaPanelReset = null;
         boolean verifiedPremium = hasAiPremiumAccess();
         LinearLayout page = createStepPage(0,
-                verifiedPremium ? "Tu plan Premium está activo" : "Elige tu plan",
+                verifiedPremium ? "Tu plan Premium está activo" : "Planes y ofertas",
                 verifiedPremium ? "Tu acceso Premium está verificado en este móvil."
                         : "Empieza gratis. Los planes Premium son opcionales.");
         if (token != null && !token.isEmpty()) {
@@ -1610,14 +1610,13 @@ public final class MainActivity extends Activity {
         LinearLayout offer = card();
         offer.setTag("tod4s3_plan_card");
         offer.setPadding(dp(16), dp(15), dp(16), dp(15));
-        int tierColor = name.contains("15 días") ? Color.rgb(106, 149, 226)
-                : name.contains("20 días") ? Color.rgb(242, 198, 106) : Color.rgb(82, 202, 177);
-        int offerStart = isDarkTheme() ? Color.rgb(25, 30, 44) : Color.rgb(255, 255, 255);
-        int offerEnd = isDarkTheme() ? Color.rgb(31, 34, 48) : Color.rgb(245, 247, 251);
+        int tierColor = Color.rgb(255, 204, 76);
+        int offerStart = isDarkTheme() ? Color.rgb(29, 25, 25) : Color.rgb(255, 255, 255);
+        int offerEnd = isDarkTheme() ? Color.rgb(35, 28, 30) : Color.rgb(245, 247, 251);
         GradientDrawable offerBackground = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
                 new int[]{offerStart, offerEnd});
         offerBackground.setCornerRadius(dp(20));
-        offerBackground.setStroke(dp(1), isDarkTheme() ? Color.rgb(54, 59, 77) : Color.rgb(224, 227, 235));
+        offerBackground.setStroke(dp(1), isDarkTheme() ? Color.rgb(255, 204, 76) : Color.rgb(224, 183, 72));
         offer.setBackground(offerBackground);
         offer.setElevation(dp(3));
         LinearLayout offerHeader = new LinearLayout(this);
@@ -2226,38 +2225,44 @@ public final class MainActivity extends Activity {
     }
 
     private LinearLayout dashboardToolbar() {
-        LinearLayout bar = new LinearLayout(this);
-        bar.setOrientation(LinearLayout.HORIZONTAL);
-        bar.setGravity(Gravity.CENTER_VERTICAL);
-        Button menu = secondaryButton("☰");
-        menu.setTextSize(20);
-        menu.setMinWidth(dp(44));
+        LinearLayout bar = card();
+        bar.setPadding(dp(12), dp(10), dp(12), dp(10));
+        bar.setBackground(roundRect(isDarkTheme() ? Color.rgb(24, 16, 24) : Color.WHITE, 20, borderColor()));
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        Button menu = primaryButton("☰");
+        menu.setTextSize(21);
+        menu.setMinHeight(dp(48));
+        menu.setPadding(0, 0, 0, 0);
         menu.setOnClickListener(this::showNavigationDrawer);
-        bar.addView(menu, new LinearLayout.LayoutParams(dp(48), dp(46)));
+        header.addView(menu, new LinearLayout.LayoutParams(dp(50), dp(48)));
+        LinearLayout identity = new LinearLayout(this);
+        identity.setOrientation(LinearLayout.VERTICAL);
         TextView title = text("Tod4S3 Sync", 18, true);
-        title.setSingleLine(true);
-        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        LinearLayout.LayoutParams titleLayout = new LinearLayout.LayoutParams(0, -2, 1f);
-        titleLayout.setMargins(dp(10), 0, dp(4), 0);
-        bar.addView(title, titleLayout);
-        Button search = secondaryButton("⌕");
-        search.setTextSize(21);
-        search.setMinWidth(dp(42));
-        search.setOnClickListener(v -> showDashboardSearch());
-        bar.addView(search, new LinearLayout.LayoutParams(dp(44), dp(44)));
-        Button sort = secondaryButton(sortOldestFirst ? "↑" : "↓");
-        sort.setTextSize(17);
-        sort.setMinWidth(dp(42));
-        sort.setOnClickListener(v -> {
-            sortOldestFirst = !sortOldestFirst;
-            showDashboard(dashboardFilter, true);
-        });
-        LinearLayout.LayoutParams sortLayout = new LinearLayout.LayoutParams(dp(44), dp(44));
-        sortLayout.setMargins(dp(5), 0, 0, 0);
-        bar.addView(sort, sortLayout);
-        LinearLayout.LayoutParams accountLayout = new LinearLayout.LayoutParams(dp(52), dp(52));
-        accountLayout.setMargins(dp(5), 0, 0, 0);
-        bar.addView(accountMenuButton(), accountLayout);
+        identity.addView(title);
+        TextView status = text((premiumActive ? "● Premium activo" : "● Plan gratuito") + "  ·  v" + appVersion(), 11, false);
+        status.setTextColor(premiumActive ? Color.rgb(53, 220, 143) : secondaryTextColor());
+        identity.addView(status, margin(0, 2, 0, 0));
+        LinearLayout.LayoutParams identityLayout = new LinearLayout.LayoutParams(0, -2, 1f);
+        identityLayout.setMargins(dp(11), 0, dp(5), 0);
+        header.addView(identity, identityLayout);
+        header.addView(accountMenuButton(), new LinearLayout.LayoutParams(dp(50), dp(50)));
+        bar.addView(header);
+        LinearLayout cloud = new LinearLayout(this);
+        cloud.setOrientation(LinearLayout.VERTICAL);
+        TextView cloudLabel = text("Nube ToDus", 12, true);
+        cloudLabel.setTextColor(primaryTextColor());
+        cloud.addView(cloudLabel, new LinearLayout.LayoutParams(0, -2, 1f));
+        TextView cloudValue = text("Uso de espacio y entregas", 10, false);
+        cloudValue.setTextColor(secondaryTextColor());
+        cloud.addView(cloudValue);
+        LinearLayout cloudRow = new LinearLayout(this);
+        cloudRow.setGravity(Gravity.CENTER_VERTICAL);
+        cloudRow.addView(cloud, new LinearLayout.LayoutParams(0, -2, 1f));
+        bar.addView(cloudRow, margin(0, 9, 0, 0));
+        View cloudProgress = new View(this);
+        cloudProgress.setBackground(roundRect(accentColor(), 8, 0));
+        bar.addView(cloudProgress, new LinearLayout.LayoutParams(dp(110), dp(5)));
         return bar;
     }
 

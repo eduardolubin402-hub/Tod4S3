@@ -584,29 +584,25 @@ class RequestedFeatureTests(unittest.TestCase):
         self.assertIn("<code>https://t.me/jk_bot?start=ref_123</code>", text)
         self.assertNotIn("<ᴄᴏᴅᴇ>", text)
 
-    def test_bot_start_uses_animated_brand_header_without_caption(self):
+    def test_bot_start_uses_original_welcome_photo_without_caption(self):
         import bot
-        self.assertEqual(bot.WELCOME_ANIMATION_PATH.name, "todus_s3_menu_animation.mp4")
-        self.assertTrue(bot.WELCOME_ANIMATION_PATH.is_file())
         self.assertEqual(bot.WELCOME_IMAGE_PATH.name, "IMG_20261102_161854_801.jpg")
         self.assertTrue(bot.WELCOME_IMAGE_PATH.is_file())
         source = (Path(__file__).resolve().parents[1] / "bot.py").read_text()
         sender = source.split("async def send_welcome_message", 1)[1].split("async def edit_welcome_message", 1)[0]
         start = source.split("async def start_command", 1)[1].split("async def ", 1)[0]
-        self.assertIn("reply_animation(animation=animation, reply_markup=reply_markup)", sender)
         self.assertIn("reply_photo(photo=photo, reply_markup=reply_markup)", sender)
+        self.assertNotIn("reply_animation", sender)
         self.assertNotIn("caption=", sender)
         self.assertIn("await send_welcome_message(", start)
 
-    def test_welcome_transition_replaces_text_message_with_animation(self):
+    def test_welcome_transition_replaces_text_message_with_photo(self):
         source = (Path(__file__).resolve().parents[1] / "bot.py").read_text()
         editor = source.split("async def edit_welcome_message", 1)[1].split("async def send_service_info_message", 1)[0]
         self.assertIn('getattr(message, "photo", None)', editor)
-        self.assertIn('getattr(message, "animation", None)', editor)
-        self.assertIn("reply_animation(animation=animation, reply_markup=reply_markup)", editor)
-        self.assertIn("InputMediaAnimation(media=animation)", editor)
         self.assertIn("await message.reply_photo(photo=photo, reply_markup=reply_markup)", editor)
         self.assertIn("InputMediaPhoto(media=photo)", editor)
+        self.assertNotIn("reply_animation", editor)
         self.assertNotIn("caption=", editor)
         self.assertIn("await message.delete()", editor)
 

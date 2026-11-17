@@ -31,7 +31,6 @@ from dotenv import load_dotenv
 from telegram import (
     BotCommand,
     CopyTextButton,
-    InputMediaAnimation,
     InputMediaPhoto,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -90,7 +89,6 @@ from sync_api import create_pairing_code, record_delivery
 
 TELEGRAM_BOT_TOKEN = ""
 OWNER_TELEGRAM_ID = ""
-WELCOME_ANIMATION_PATH = Path(__file__).with_name("todus_s3_menu_animation.mp4")
 WELCOME_IMAGE_PATH = Path(__file__).with_name("IMG_20261102_161854_801.jpg")
 
 logging.basicConfig(
@@ -4892,11 +4890,7 @@ def welcome_text(user_id: int, user_name: str, username: str | None = None) -> s
 
 async def send_welcome_message(message, user_id: int, user_name: str, username: str | None,
                                reply_markup: InlineKeyboardMarkup, extra_text: str = "") -> None:
-    """Muestra la animación de marca con los botones del bot."""
-    if WELCOME_ANIMATION_PATH.is_file() and hasattr(message, "reply_animation"):
-        with WELCOME_ANIMATION_PATH.open("rb") as animation:
-            await message.reply_animation(animation=animation, reply_markup=reply_markup)
-        return
+    """Muestra solo la foto de marca con los botones del bot."""
     if WELCOME_IMAGE_PATH.is_file() and hasattr(message, "reply_photo"):
         with WELCOME_IMAGE_PATH.open("rb") as photo:
             await message.reply_photo(photo=photo, reply_markup=reply_markup)
@@ -4909,28 +4903,8 @@ async def send_welcome_message(message, user_id: int, user_name: str, username: 
 
 async def edit_welcome_message(message, user_id: int, user_name: str, username: str | None,
                                reply_markup: InlineKeyboardMarkup, extra_text: str = "") -> None:
-    """Cambia la pantalla de verificación por la animación de marca sin texto."""
+    """Cambia la pantalla de verificación por la foto de marca sin texto."""
     caption = welcome_text(user_id, user_name, username) + extra_text
-    if WELCOME_ANIMATION_PATH.is_file():
-        is_media_message = bool(
-            getattr(message, "photo", None) or getattr(message, "animation", None)
-        )
-        if is_media_message and hasattr(message, "edit_media"):
-            with WELCOME_ANIMATION_PATH.open("rb") as animation:
-                await message.edit_media(
-                    media=InputMediaAnimation(media=animation),
-                    reply_markup=reply_markup,
-                )
-            return
-        if hasattr(message, "reply_animation"):
-            with WELCOME_ANIMATION_PATH.open("rb") as animation:
-                await message.reply_animation(animation=animation, reply_markup=reply_markup)
-            if hasattr(message, "delete"):
-                try:
-                    await message.delete()
-                except Exception:
-                    pass
-            return
     if WELCOME_IMAGE_PATH.is_file() and getattr(message, "photo", None) and hasattr(message, "edit_media"):
         with WELCOME_IMAGE_PATH.open("rb") as photo:
             await message.edit_media(
@@ -4952,10 +4926,18 @@ async def edit_welcome_message(message, user_id: int, user_name: str, username: 
 
 async def send_service_info_message(message, user_id: int, user_name: str,
                                     username: str | None) -> None:
-    """Muestra la animación de marca y conserva los botones."""
-    await edit_welcome_message(
-        message, user_id, user_name, username, main_keyboard(user_id)
-    )
+    """Muestra solo la foto de marca y conserva los botones."""
+    markup = main_keyboard(user_id)
+    if WELCOME_IMAGE_PATH.is_file() and hasattr(message, "reply_photo"):
+        with WELCOME_IMAGE_PATH.open("rb") as photo:
+            await message.reply_photo(photo=photo, reply_markup=markup)
+        if hasattr(message, "delete"):
+            try:
+                await message.delete()
+            except Exception:
+                pass
+        return
+    await message.edit_text(welcome_text(user_id, user_name, username), reply_markup=markup)
 
 
 async def edit_query_message_text(message, text: str, **kwargs):

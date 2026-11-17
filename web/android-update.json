@@ -3,6 +3,5 @@
   "version_name": "1.5.53",
   "manifest_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/web/android-update.json",
   "apk_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/Tod4S3-Sync-v1.5.53.apk",
-  "sha256": "6901e19e68ba527c832945b1e48e2939b07356c2d8506c1307718f8cdf278d8e",
-  "release_notes": "Rediseño de planes, Premium, vinculación y tareas activas."
+  "sha256": "6901e19e68ba527c832945b1e48e2939b07356c2d8506c1307718f8cdf278d8e"
 }

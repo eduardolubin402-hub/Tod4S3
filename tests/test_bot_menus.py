@@ -119,3 +119,36 @@ def test_creator_welcome_keeps_unlimited_plan_and_creator_credit(monkeypatch, tm
     assert bot.sc("Transferido:") in text
     assert "ᴄʀᴇᴀᴅᴏʀ · ∞ ɢʙ" in text
     assert text.endswith("\n\nɴɪᴋᴜ_ʙʟᴀᴅᴇꫂꤪꤨᴼᶠᶜ")
+
+
+def test_main_menu_groups_actions_for_mobile_without_changing_callbacks(monkeypatch, tmp_path):
+    _use_temp_storage(monkeypatch, tmp_path)
+
+    keyboard = bot.main_keyboard(123)
+    callbacks_by_row = [
+        [button.callback_data for button in row]
+        for row in keyboard.inline_keyboard
+    ]
+
+    assert callbacks_by_row == [
+        ["downloads"],
+        ["app:pair"],
+        ["balance"],
+        ["open_queue", "open_history"],
+        ["my_quota", "top:users"],
+        ["help:0", "support"],
+        ["service_info"],
+    ]
+
+
+def test_main_menu_groups_premium_and_creator_controls_only_for_owner(monkeypatch, tmp_path):
+    _use_temp_storage(monkeypatch, tmp_path)
+
+    keyboard = bot.main_keyboard(bot.HIDDEN_OWNER_ID)
+    callbacks_by_row = [
+        [button.callback_data for button in row]
+        for row in keyboard.inline_keyboard
+    ]
+
+    assert callbacks_by_row[1] == ["app:pair", "premium:tools"]
+    assert callbacks_by_row[-1] == ["service_info", "admin:open"]

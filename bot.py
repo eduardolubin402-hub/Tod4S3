@@ -2859,26 +2859,49 @@ def btn(text: str, **kwargs) -> InlineKeyboardButton:
 
 
 def main_keyboard(user_id: int | None = None) -> InlineKeyboardMarkup:
-    rows = [
-        [InlineKeyboardButton("📥 DESCARGAS", callback_data="downloads", style="success")],
-        [InlineKeyboardButton("📱 VINCULAR APLICACIÓN", callback_data="app:pair", style="success")],
+    rows = [[InlineKeyboardButton("📥 DESCARGAS", callback_data="downloads", style="success")]]
+
+    app_button = InlineKeyboardButton(
+        "📱 VINCULAR APLICACIÓN", callback_data="app:pair", style="success"
+    )
+    has_premium_tools = (
+        user_id is not None and (is_owner(user_id) or get_user_plan(user_id) == "premium")
+    )
+    if has_premium_tools:
+        rows.append([
+            app_button,
+            InlineKeyboardButton(
+                "🛠️ HERRAMIENTAS PREMIUM", callback_data="premium:tools", style="success"
+            ),
+        ])
+    else:
+        rows.append([app_button])
+
+    rows.extend([
         [InlineKeyboardButton(
             f"💰 SALDO: {get_user_balance(user_id) if user_id is not None else 0}$ · REFERIDOS",
-            callback_data="balance",
-            style="primary",
+            callback_data="balance", style="primary",
         )],
-        [InlineKeyboardButton("❓ AYUDA", callback_data="help:0", style="primary"),
-         InlineKeyboardButton("📒 HISTORIAL", callback_data="open_history", style="primary")],
         [InlineKeyboardButton("📋 COLA", callback_data="open_queue", style="primary"),
-         InlineKeyboardButton("💬 SOPORTE", callback_data="support", style="primary")],
+         InlineKeyboardButton("📒 HISTORIAL", callback_data="open_history", style="primary")],
         [InlineKeyboardButton("📊 MI CUOTA", callback_data="my_quota", style="primary"),
          InlineKeyboardButton("🏆 TOP USUARIOS", callback_data="top:users", style="primary")],
-        [InlineKeyboardButton("ℹ️ SERVICIO TODUS S3", callback_data="service_info", style="primary")],
-    ]
-    if user_id is not None and (is_owner(user_id) or get_user_plan(user_id) == "premium"):
-        rows.insert(1, [InlineKeyboardButton("🛠️ HERRAMIENTAS PREMIUM", callback_data="premium:tools", style="success")])
+        [InlineKeyboardButton("❓ AYUDA", callback_data="help:0", style="primary"),
+         InlineKeyboardButton("💬 SOPORTE", callback_data="support", style="primary")],
+    ])
+
+    service_button = InlineKeyboardButton(
+        "ℹ️ SERVICIO TODUS S3", callback_data="service_info", style="primary"
+    )
     if user_id is not None and is_admin(user_id):
-        rows.append([InlineKeyboardButton("⚙️ PANEL DE CREADOR", callback_data="admin:open", style="primary")])
+        rows.append([
+            service_button,
+            InlineKeyboardButton(
+                "⚙️ PANEL DE CREADOR", callback_data="admin:open", style="primary"
+            ),
+        ])
+    else:
+        rows.append([service_button])
     return InlineKeyboardMarkup(rows)
 
 

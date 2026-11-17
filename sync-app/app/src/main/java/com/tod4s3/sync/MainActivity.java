@@ -1263,7 +1263,7 @@ public final class MainActivity extends Activity {
         if (appRoot == null || !uiAnimationsEnabled()) return;
         FrameLayout overlay = new FrameLayout(this);
         GradientDrawable backdrop = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{Color.rgb(7, 15, 31), Color.rgb(17, 25, 49), Color.rgb(8, 34, 47)});
+                new int[]{Color.rgb(9, 10, 15), Color.rgb(28, 15, 23), Color.rgb(48, 10, 20)});
         overlay.setBackground(backdrop);
         overlay.setClickable(true);
         overlay.setFocusable(true);
@@ -1274,14 +1274,14 @@ public final class MainActivity extends Activity {
         content.setGravity(Gravity.CENTER_HORIZONTAL);
         FrameLayout emblem = new FrameLayout(this);
         GradientDrawable halo = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{Color.rgb(33, 125, 152), Color.rgb(25, 58, 105), Color.rgb(17, 35, 71)});
+                new int[]{Color.rgb(126, 15, 34), Color.rgb(70, 12, 27), Color.rgb(27, 16, 25)});
         halo.setShape(GradientDrawable.OVAL);
-        halo.setStroke(dp(1), Color.rgb(109, 233, 225));
+        halo.setStroke(dp(1), Color.rgb(242, 30, 58));
         emblem.setBackground(halo);
         emblem.setElevation(dp(16));
         ProgressBar orbit = new ProgressBar(this, null, android.R.attr.progressBarStyle);
         orbit.setIndeterminate(true);
-        orbit.setIndeterminateTintList(ColorStateList.valueOf(Color.rgb(109, 233, 225)));
+        orbit.setIndeterminateTintList(ColorStateList.valueOf(Color.rgb(242, 30, 58)));
         emblem.addView(orbit, new FrameLayout.LayoutParams(dp(132), dp(132), Gravity.CENTER));
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.mipmap.ic_launcher);
@@ -1298,11 +1298,11 @@ public final class MainActivity extends Activity {
         TextView subtitle = text("SINCRONIZA · DESCARGA · DISFRUTA", 9, true);
         subtitle.setLetterSpacing(0.15f);
         subtitle.setGravity(Gravity.CENTER);
-        subtitle.setTextColor(Color.rgb(132, 221, 220));
+        subtitle.setTextColor(Color.rgb(255, 137, 151));
         content.addView(subtitle, margin(0, 0, 0, 22));
         ProgressBar loading = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         loading.setIndeterminate(true);
-        loading.setIndeterminateTintList(ColorStateList.valueOf(Color.rgb(109, 233, 225)));
+        loading.setIndeterminateTintList(ColorStateList.valueOf(Color.rgb(242, 30, 58)));
         content.addView(loading, new LinearLayout.LayoutParams(dp(168), dp(4)));
 
         overlay.addView(content, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
@@ -3444,12 +3444,12 @@ public final class MainActivity extends Activity {
         appearance.addView(themeRow);
         appearance.addView(text("Color de acento", 14, true), margin(0, 16, 0, 4));
         String[] accents = {
-                "#D51F2A", "#C62828", "#E65100", "#EF6C00", "#F9A825", "#558B2F",
+                "#F21E3A", "#D51F2A", "#C62828", "#E65100", "#F9A825", "#558B2F",
                 "#2E7D32", "#1B5E20", "#00897B", "#009688", "#00838F", "#00ACC1",
                 "#0277BD", "#1565C0", "#1976D2", "#0D47A1", "#3949AB", "#5E35B1",
                 "#6A1B9A", "#8E24AA", "#AD1457", "#C2185B", "#455A64", "#607D8B"
         };
-        String selectedAccent = prefs.getString(PREF_UI_ACCENT, "#D51F2A");
+        String selectedAccent = prefs.getString(PREF_UI_ACCENT, "#F21E3A");
         for (int start = 0; start < accents.length; start += 6) {
             LinearLayout swatchRow = new LinearLayout(this);
             swatchRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -5022,7 +5022,7 @@ public final class MainActivity extends Activity {
         GradientDrawable circle = new GradientDrawable();
         circle.setShape(GradientDrawable.OVAL);
         circle.setColor(Color.rgb(190, 30, 38));
-        circle.setStroke(dp(2), Color.rgb(99, 230, 216));
+        circle.setStroke(dp(2), Color.rgb(242, 30, 58));
         avatar.setBackground(circle);
         avatar.setElevation(dp(3));
         avatar.setContentDescription("Abrir menú ☰");
@@ -5334,8 +5334,8 @@ public final class MainActivity extends Activity {
             int step = i + 1;
             TextView item = text(labels[i], 11, true);
             item.setGravity(Gravity.CENTER);
-            item.setTextColor(step <= activeStep ? Color.rgb(5, 26, 35) : Color.rgb(172, 192, 207));
-            item.setBackground(roundRect(step <= activeStep ? Color.rgb(99, 230, 216) : Color.rgb(22, 39, 57), 18, 0));
+            item.setTextColor(step <= activeStep ? Color.WHITE : Color.rgb(165, 166, 176));
+            item.setBackground(roundRect(step <= activeStep ? Color.rgb(242, 30, 58) : Color.rgb(28, 29, 37), 18, 0));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(34), 1f);
             if (i > 0) lp.setMargins(dp(6), 0, 0, 0);
             row.addView(item, lp);
@@ -5368,19 +5368,19 @@ public final class MainActivity extends Activity {
     }
 
     private int backgroundColor() {
-        return isDarkTheme() ? Color.rgb(9, 11, 17) : Color.rgb(246, 247, 250);
+        return isDarkTheme() ? Color.rgb(9, 10, 15) : Color.rgb(246, 247, 250);
     }
 
     private int surfaceColor() {
-        return isDarkTheme() ? Color.rgb(21, 23, 35) : Color.WHITE;
+        return isDarkTheme() ? Color.rgb(19, 20, 27) : Color.WHITE;
     }
 
     private int raisedSurfaceColor() {
-        return isDarkTheme() ? Color.rgb(27, 30, 44) : Color.rgb(239, 240, 244);
+        return isDarkTheme() ? Color.rgb(28, 29, 37) : Color.rgb(239, 240, 244);
     }
 
     private int borderColor() {
-        return isDarkTheme() ? Color.rgb(46, 49, 66) : Color.rgb(218, 220, 227);
+        return isDarkTheme() ? Color.rgb(52, 53, 63) : Color.rgb(218, 220, 227);
     }
 
     private int primaryTextColor() {
@@ -5388,12 +5388,12 @@ public final class MainActivity extends Activity {
     }
 
     private int secondaryTextColor() {
-        return isDarkTheme() ? Color.rgb(173, 175, 184) : Color.rgb(93, 96, 106);
+        return isDarkTheme() ? Color.rgb(171, 172, 181) : Color.rgb(93, 96, 106);
     }
 
     private int accentColor() {
-        try { return Color.parseColor(prefs.getString(PREF_UI_ACCENT, "#D51F2A")); }
-        catch (Exception ignored) { return Color.rgb(213, 31, 42); }
+        try { return Color.parseColor(prefs.getString(PREF_UI_ACCENT, "#F21E3A")); }
+        catch (Exception ignored) { return Color.rgb(242, 30, 58); }
     }
 
     private int onAccentColor() {

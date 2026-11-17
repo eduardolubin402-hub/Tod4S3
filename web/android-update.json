@@ -3,5 +3,6 @@
   "version_name": "1.5.50",
   "manifest_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/web/android-update.json",
   "apk_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/Tod4S3-Sync-v1.5.50.apk",
-  "sha256": "1b5fcc397bd1d407151a9407157af961e7191b740446e68245c29468e06a7337"
+  "sha256": "1b5fcc397bd1d407151a9407157af961e7191b740446e68245c29468e06a7337",
+  "release_notes": "Menú, dashboard, AiTod4S3 y pantallas rediseñadas según referencias."
 }

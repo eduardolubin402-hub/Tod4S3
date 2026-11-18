@@ -1,7 +1,8 @@
 {
-  "version_code": 105,
-  "version_name": "1.5.60",
-  "manifest_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/web/android-update.json",
-  "apk_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/Tod4S3-Sync-v1.5.60.apk",
-  "sha256": "b6ab8fbcaa2d3f3d54c736c305001d3e46a358cef99df03e573157037aec7c1a"
+  "version_code": 106,
+  "version_name": "1.5.61",
+  "manifest_url": "https://github.com/eduardolubin402-hub/Tod4S3/raw/refs/heads/main/web/android-update.json",
+  "apk_url": "https://github.com/eduardolubin402-hub/Tod4S3/raw/refs/heads/main/Tod4S3-Sync-v1.5.61.apk",
+  "sha256": "c0095a5a418c908a3d9afdd42da3eaebb8eb7b622a29e3ca3ed1fc42c5d4281f",
+  "release_notes": "Corrección definitiva: se elimina el fondo personalizado que cubría Descargas con un tinte rojo."
 }

@@ -1414,7 +1414,11 @@ public final class MainActivity extends Activity {
         wallpaperScrim = null;
         appRoot.setBackgroundColor(backgroundColor());
         appRoot.removeView(appScroll);
-        String imageUri = prefs == null ? "" : prefs.getString(PREF_WALLPAPER_URI, "");
+        // No dibujar fondos de galería debajo de la interfaz principal. Una imagen
+        // guardada anteriormente podía cubrir visualmente Descargas y el menú con
+        // un tinte rojo, dando la impresión de que la pantalla se había bloqueado.
+        // El fondo oficial de la app es sólido y las tarjetas ya aportan el contraste.
+        String imageUri = "";
         if (imageUri != null && !imageUri.isEmpty()) {
             try {
                 Bitmap bitmap = decodeWallpaper(Uri.parse(imageUri));

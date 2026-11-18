@@ -1,7 +1,7 @@
 {
-  "version_code": 118,
-  "version_name": "1.5.73",
+  "version_code": 119,
+  "version_name": "1.5.74",
   "manifest_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/web/android-update.json",
-  "apk_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/Tod4S3-Sync-v1.5.73.apk",
-  "sha256": "38d6323f413fa01ca4373a13d1895872c100034bc5445640458d90d428f23df7"
+  "apk_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/Tod4S3-Sync-v1.5.74.apk",
+  "sha256": "da6b6aac87c3fab95c815fddc837a70b07be305461003eb19bf3fa0415c63c22"
 }

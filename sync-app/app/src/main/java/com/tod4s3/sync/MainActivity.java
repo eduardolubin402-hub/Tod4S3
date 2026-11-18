@@ -273,6 +273,8 @@ public final class MainActivity extends Activity {
     private boolean aiVoiceCallListening;
     private boolean aiVoiceCallWaitingForReply;
     private boolean aiVoiceCallMuted;
+    private boolean aiVoiceCallSpeaking;
+    private boolean aiVoiceCallBargeInListening;
     private FrameLayout aiLargeOrb;
     private ObjectAnimator aiSpeakingOrbAnimator;
     private Switch aiVoiceToggle;
@@ -4799,10 +4801,13 @@ public final class MainActivity extends Activity {
                 }
                 if (aiMicButton != null) aiMicButton.setAlpha(0.55f);
             }
-            @Override public void onBeginningOfSpeech() { }
+            @Override public void onBeginningOfSpeech() {
+                if (callMode && aiVoiceCallSpeaking) interruptAiVoiceCallSpeech();
+            }
             @Override public void onRmsChanged(float rmsdB) { }
             @Override public void onBufferReceived(byte[] buffer) { }
             @Override public void onEndOfSpeech() {
+                if (callMode && aiVoiceCallSpeaking) return;
                 if (callMode && aiChatStatus != null) aiChatStatus.setText("LLAMADA · PROCESANDO");
                 if (callMode) {
                     setAiVoiceCallStatus("PROCESANDO LO QUE DIJISTE…");
@@ -4826,6 +4831,10 @@ public final class MainActivity extends Activity {
             @Override public void onResults(Bundle results) {
                 aiVoiceCallListening = false;
                 if (aiMicButton != null) aiMicButton.setAlpha(1f);
+                if (callMode && aiVoiceCallSpeaking) {
+                    interruptAiVoiceCallSpeech();
+                    return;
+                }
                 ArrayList<String> matches = results == null ? null
                         : results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                 if (matches != null && !matches.isEmpty() && aiComposer != null && (!callMode || aiVoiceCallActive)) {
@@ -4841,13 +4850,21 @@ public final class MainActivity extends Activity {
                     }, 350L);
                 }
             }
-            @Override public void onPartialResults(Bundle partialResults) { }
+            @Override public void onPartialResults(Bundle partialResults) {
+                if (callMode && aiVoiceCallSpeaking && partialResults != null) {
+                    ArrayList<String> partial = partialResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                    if (partial != null && !partial.isEmpty() && !partial.get(0).trim().isEmpty()) {
+                        interruptAiVoiceCallSpeech();
+                    }
+                }
+            }
             @Override public void onEvent(int eventType, Bundle params) { }
         });
         aiSpeechIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         aiSpeechIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
         aiSpeechIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-CU");
         aiSpeechIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "es");
+        aiSpeechIntent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
         aiSpeechIntent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Habla con AiTod4S3");
         aiSpeechRecognizer.startListening(aiSpeechIntent);
     }
@@ -4940,6 +4957,8 @@ public final class MainActivity extends Activity {
         aiVoiceCallActive = false;
         aiVoiceCallListening = false;
         aiVoiceCallWaitingForReply = false;
+        aiVoiceCallSpeaking = false;
+        aiVoiceCallBargeInListening = false;
         aiVoiceCallMuted = false;
         if (aiSpeechRecognizer != null) aiSpeechRecognizer.cancel();
         if (aiTextToSpeech != null) aiTextToSpeech.stop();
@@ -4956,6 +4975,20 @@ public final class MainActivity extends Activity {
         updateAiVoiceCallButton();
         setAiVoiceMode(false);
         if (aiChatStatus != null) aiChatStatus.setText("en línea");
+    }
+    private void interruptAiVoiceCallSpeech() {
+        if (!aiVoiceCallActive || !aiVoiceCallSpeaking) return;
+        aiVoiceCallSpeaking = false;
+        aiVoiceCallBargeInListening = false;
+        aiSpeechGeneration++;
+        aiLastUtteranceId = "";
+        if (aiTextToSpeech != null) aiTextToSpeech.stop();
+        if (aiSpeechRecognizer != null) aiSpeechRecognizer.cancel();
+        setAiVoiceCallStatus("ESCUCHANDO…");
+        setAiActivityState("Te estoy escuchando…", false, false);
+        handler.postDelayed(() -> {
+            if (aiVoiceCallActive && !aiChatRequestInFlight) beginAiSpeechRecognition(true);
+        }, 120L);
     }
     private void updateAiVoiceCallButton() {
         if (aiCallButton == null) return;
@@ -5296,10 +5329,17 @@ public final class MainActivity extends Activity {
                 aiTextToSpeech.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                     @Override public void onStart(String utteranceId) {
                         runOnUiThread(() -> {
+                            aiVoiceCallSpeaking = aiVoiceCallActive;
                             if (aiChatStatus != null) aiChatStatus.setText("AiTod4S3 ESTÁ HABLANDO");
                             if (aiVoiceCallActive) {
                                 setAiVoiceCallStatus("AiTod4S3 ESTÁ HABLANDO…");
                                 animateAiVoiceCallOrb(true);
+                                aiVoiceCallBargeInListening = true;
+                                handler.postDelayed(() -> {
+                                    if (aiVoiceCallActive && aiVoiceCallSpeaking && aiVoiceCallBargeInListening) {
+                                        beginAiSpeechRecognition(true);
+                                    }
+                                }, 180L);
                             }
                             setAiActivityState("AiTod4S3 está hablando…", true, true);
                         });
@@ -5308,6 +5348,8 @@ public final class MainActivity extends Activity {
                     @Override public void onDone(String utteranceId) {
                         if (utteranceId != null && utteranceId.equals(aiLastUtteranceId)) {
                             runOnUiThread(() -> {
+                                aiVoiceCallSpeaking = false;
+                                aiVoiceCallBargeInListening = false;
                                 aiLastUtteranceId = "";
                                 setAiActivityState("", false, false);
                                 if (aiVoiceCallActive) {
@@ -5328,6 +5370,8 @@ public final class MainActivity extends Activity {
                     @Override public void onError(String utteranceId) {
                         if (utteranceId != null && utteranceId.equals(aiLastUtteranceId)) {
                             runOnUiThread(() -> {
+                                aiVoiceCallSpeaking = false;
+                                aiVoiceCallBargeInListening = false;
                                 aiLastUtteranceId = "";
                                 setAiActivityState("", false, false);
                                 if (aiVoiceCallActive) {
@@ -6174,7 +6218,12 @@ public final class MainActivity extends Activity {
     }
 
     private void showPage(LinearLayout page, boolean animated) {
-        if (!showingAiChat) {
+        boolean aiPage = showingAiChat;
+        if (aiPage) {
+            appScroll.setFillViewport(true);
+            appScroll.setPadding(0, 0, 0, 0);
+        } else {
+            appScroll.setFillViewport(false);
             appScroll.setPadding(0, 0, 0, dp(120));
         }
         homeTabPageVisible = false;
@@ -6194,7 +6243,7 @@ public final class MainActivity extends Activity {
         page.setVisibility(View.VISIBLE);
         page.setAlpha(animated ? 0f : 1f);
         page.setTranslationY(animated ? dp(12) : 0f);
-        appScroll.addView(page, new FrameLayout.LayoutParams(-1, -2));
+        appScroll.addView(page, new FrameLayout.LayoutParams(-1, aiPage ? -1 : -2));
         if (animated) {
             page.animate().alpha(1f).translationY(0f).setDuration(180)
                     .setInterpolator(new DecelerateInterpolator()).start();

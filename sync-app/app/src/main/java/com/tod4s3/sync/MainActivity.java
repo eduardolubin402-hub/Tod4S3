@@ -26,6 +26,9 @@ import android.provider.DocumentsContract;
 import android.telephony.TelephonyManager;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
+import android.speech.SpeechRecognizer;
+import android.speech.RecognizerIntent;
+import android.speech.RecognitionListener;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.util.Base64;
@@ -140,6 +143,7 @@ public final class MainActivity extends Activity {
     private static final int REQUEST_NOTIFICATIONS = 706;
     private static final int REQUEST_UPDATE_INSTALL_PERMISSION = 707;
     private static final int REQUEST_USSD_BALANCE_PERMISSION = 708;
+    private static final int REQUEST_AI_AUDIO_PERMISSION = 709;
     private static final int REQUEST_WALLPAPER_IMAGE = 709;
     private static final int REQUEST_SPEED_OVERLAY_PERMISSION = 710;
     private static final String USSD_BALANCE_CODE = "*222*328#";
@@ -258,6 +262,10 @@ public final class MainActivity extends Activity {
     private EditText aiComposer;
     private Button aiSendButton;
     private View aiMicButton;
+    private SpeechRecognizer aiSpeechRecognizer;
+    private Intent aiSpeechIntent;
+    private FrameLayout aiLargeOrb;
+    private ObjectAnimator aiSpeakingOrbAnimator;
     private Switch aiVoiceToggle;
     private TextView aiChatStatus;
     private LinearLayout aiActivityPanel;
@@ -540,7 +548,7 @@ public final class MainActivity extends Activity {
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(dp(22), dp(10), dp(22), dp(18));
-        content.setBackground(roundRect(Color.rgb(24, 29, 42), 28, Color.rgb(55, 65, 84)));
+        content.setBackground(roundRect(Color.rgb(10, 11, 16), 28, Color.rgb(88, 96, 116)));
         View handle = new View(this);
         handle.setBackground(roundRect(Color.rgb(105, 117, 139), 6, 0));
         LinearLayout.LayoutParams handleParams = new LinearLayout.LayoutParams(dp(42), dp(5));
@@ -571,7 +579,7 @@ public final class MainActivity extends Activity {
         LinearLayout rejection = new LinearLayout(this);
         rejection.setOrientation(LinearLayout.VERTICAL);
         rejection.setPadding(dp(12), dp(9), dp(12), dp(8));
-        rejection.setBackground(roundRect(Color.rgb(29, 33, 46), 14, Color.rgb(52, 61, 80)));
+        rejection.setBackground(roundRect(Color.rgb(23, 26, 35), 14, Color.rgb(76, 84, 104)));
         LinearLayout rejectionTop = new LinearLayout(this);
         rejectionTop.setGravity(Gravity.CENTER_VERTICAL);
         TextView rejectionLabel = text("Rechazos de esta versión", 11, true);
@@ -610,7 +618,7 @@ public final class MainActivity extends Activity {
             window.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT);
             window.setGravity(Gravity.BOTTOM);
             WindowManager.LayoutParams updateParams = window.getAttributes();
-            updateParams.dimAmount = 0.72f;
+            updateParams.dimAmount = 0.84f;
             window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
             window.setAttributes(updateParams);
         }
@@ -4286,6 +4294,7 @@ public final class MainActivity extends Activity {
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setPadding(dp(20), dp(10), dp(20), dp(14));
+        page.setMinimumHeight(Math.max(dp(520), getResources().getDisplayMetrics().heightPixels - dp(96)));
         page.setBackground(themedBackground());
 
         LinearLayout header = new LinearLayout(this);
@@ -4311,7 +4320,7 @@ public final class MainActivity extends Activity {
         setButtonIcon(newChat, R.drawable.ic_edit, Color.WHITE);
         newChat.setContentDescription("Nuevo chat");
         newChat.setPadding(0, 0, 0, 0);
-        newChat.setOnClickListener(v -> { aiChatMessages.clear(); renderAiConversation(); });
+        newChat.setOnClickListener(this::showAiChatOptions);
         header.addView(newChat, new LinearLayout.LayoutParams(dp(42), dp(42)));
         page.addView(header, margin(0, 0, 0, 7));
 
@@ -4382,7 +4391,7 @@ public final class MainActivity extends Activity {
         composerShell.addView(composer, new FrameLayout.LayoutParams(-1, -1));
         page.addView(composerShell, margin(0, 0, 0, 8));
         aiSendButton.setOnClickListener(v -> { if (!aiChatRequestInFlight) sendAiMessage(); });
-        aiMicButton.setOnClickListener(v -> { if (aiComposer != null) aiComposer.requestFocus(); ((android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE)).showSoftInput(aiComposer, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT); });
+        aiMicButton.setOnClickListener(v -> startAiVoiceInput());
         aiComposer.setOnEditorActionListener((view, actionId, event) -> { if (actionId == EditorInfo.IME_ACTION_SEND) { sendAiMessage(); return true; } return false; });
         loadAiChatHistory();
         renderAiConversation();
@@ -4425,6 +4434,36 @@ public final class MainActivity extends Activity {
         if (aiSendButton != null) {
             setButtonIcon(aiSendButton, visible ? R.drawable.ic_pause : R.drawable.ic_send, Color.WHITE);
             aiSendButton.setContentDescription(visible ? "Pausar respuesta" : "Enviar pregunta");
+        }
+        if (speaking && visible && aiLargeOrb == null && aiConversationBox != null) {
+            aiLargeOrb = createAiOrb(dp(96), true);
+            LinearLayout.LayoutParams speakingOrbParams = new LinearLayout.LayoutParams(dp(96), dp(96));
+            speakingOrbParams.gravity = Gravity.CENTER_HORIZONTAL;
+            aiConversationBox.addView(aiLargeOrb, 0, speakingOrbParams);
+        } else if (!visible && aiLargeOrb != null && aiLargeOrb.getParent() == aiConversationBox
+                && !aiChatMessages.isEmpty()) {
+            aiConversationBox.removeView(aiLargeOrb);
+            aiLargeOrb = null;
+        }
+        if (aiLargeOrb != null) {
+            if (speaking && visible) {
+                if (aiSpeakingOrbAnimator == null) {
+                    aiSpeakingOrbAnimator = ObjectAnimator.ofPropertyValuesHolder(
+                            aiLargeOrb,
+                            android.animation.PropertyValuesHolder.ofFloat(View.SCALE_X, 1f, 1.08f, 0.98f, 1.05f, 1f),
+                            android.animation.PropertyValuesHolder.ofFloat(View.SCALE_Y, 1f, 1.08f, 0.98f, 1.05f, 1f),
+                            android.animation.PropertyValuesHolder.ofFloat(View.ALPHA, 1f, 0.82f, 1f));
+                    aiSpeakingOrbAnimator.setDuration(900L);
+                    aiSpeakingOrbAnimator.setRepeatCount(ObjectAnimator.INFINITE);
+                    aiSpeakingOrbAnimator.setInterpolator(new DecelerateInterpolator());
+                }
+                if (!aiSpeakingOrbAnimator.isRunning()) aiSpeakingOrbAnimator.start();
+            } else if (aiSpeakingOrbAnimator != null) {
+                aiSpeakingOrbAnimator.cancel();
+                aiLargeOrb.setScaleX(1f);
+                aiLargeOrb.setScaleY(1f);
+                aiLargeOrb.setAlpha(1f);
+            }
         }
         if (speaking && visible) {
             for (ObjectAnimator animator : aiVoiceAnimators) {
@@ -4476,6 +4515,7 @@ public final class MainActivity extends Activity {
         if (aiChatMessages.isEmpty()) {
             aiConversationBox.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
             FrameLayout orb = createAiOrb(dp(140), true);
+            aiLargeOrb = orb;
             aiConversationBox.addView(orb, new LinearLayout.LayoutParams(dp(140), dp(140)));
             TextView title = text("Hola, soy AiTod4S3", 27, true);
             title.setGravity(Gravity.CENTER);
@@ -4696,6 +4736,56 @@ public final class MainActivity extends Activity {
         aiComposer.setText(question);
         aiComposer.setSelection(aiComposer.getText().length());
         sendAiMessage();
+    }
+
+    private void startAiVoiceInput() {
+        if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_AI_AUDIO_PERMISSION);
+            return;
+        }
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            Toast.makeText(this, "El dictado de voz no está disponible en este teléfono.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (aiSpeechRecognizer != null) aiSpeechRecognizer.destroy();
+        aiSpeechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+        aiSpeechRecognizer.setRecognitionListener(new RecognitionListener() {
+            @Override public void onReadyForSpeech(Bundle params) {
+                if (aiChatStatus != null) aiChatStatus.setText("escuchando…");
+                if (aiMicButton != null) aiMicButton.setAlpha(0.55f);
+            }
+            @Override public void onBeginningOfSpeech() { }
+            @Override public void onRmsChanged(float rmsdB) { }
+            @Override public void onBufferReceived(byte[] buffer) { }
+            @Override public void onEndOfSpeech() { }
+            @Override public void onError(int error) {
+                if (aiMicButton != null) aiMicButton.setAlpha(1f);
+                if (aiChatStatus != null) aiChatStatus.setText("en línea");
+                if (error != SpeechRecognizer.ERROR_NO_MATCH && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+                    Toast.makeText(MainActivity.this, "No se entendió el audio. Vuelve a intentarlo.", Toast.LENGTH_SHORT).show();
+                }
+            }
+            @Override public void onResults(Bundle results) {
+                if (aiMicButton != null) aiMicButton.setAlpha(1f);
+                ArrayList<String> matches = results == null ? null
+                        : results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                if (matches != null && !matches.isEmpty() && aiComposer != null) {
+                    aiComposer.setText(matches.get(0));
+                    aiComposer.setSelection(aiComposer.length());
+                    setAiVoiceMode(true);
+                    sendAiMessage();
+                }
+            }
+            @Override public void onPartialResults(Bundle partialResults) { }
+            @Override public void onEvent(int eventType, Bundle params) { }
+        });
+        aiSpeechIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        aiSpeechIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        aiSpeechIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-CU");
+        aiSpeechIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "es");
+        aiSpeechIntent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Habla con AiTod4S3");
+        aiSpeechRecognizer.startListening(aiSpeechIntent);
     }
 
     private void showAiHelp() {
@@ -7320,6 +7410,12 @@ public final class MainActivity extends Activity {
             else showBalancePermissionDenied();
             return;
         }
+        if (requestCode == REQUEST_AI_AUDIO_PERMISSION) {
+            boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+            if (granted) startAiVoiceInput();
+            else Toast.makeText(this, "Concede permiso al micrófono para hablar con AiTod4S3.", Toast.LENGTH_LONG).show();
+            return;
+        }
         if (requestCode == REQUEST_WRITE_STORAGE && syncStatus != null) {
             boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
             syncStatus.setText(granted
@@ -7572,6 +7668,12 @@ public final class MainActivity extends Activity {
         }
         for (ObjectAnimator animator : aiVoiceAnimators) animator.cancel();
         aiVoiceAnimators.clear();
+        if (aiSpeechRecognizer != null) {
+            aiSpeechRecognizer.cancel();
+            aiSpeechRecognizer.destroy();
+            aiSpeechRecognizer = null;
+        }
+        if (aiSpeakingOrbAnimator != null) aiSpeakingOrbAnimator.cancel();
         if (aiTextToSpeech != null) {
             aiTextToSpeech.stop();
             aiTextToSpeech.shutdown();

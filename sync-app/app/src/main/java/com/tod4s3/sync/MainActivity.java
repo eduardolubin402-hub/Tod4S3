@@ -1266,7 +1266,7 @@ public final class MainActivity extends Activity {
     private void buildUi() {
         appRoot = new FrameLayout(this);
         appRoot.setBackground(themedBackground());
-        appScroll = new ScrollView(this);
+        appScroll = new FixedOuterScrollView(this);
         appScroll.setFillViewport(true);
         appScroll.setClipToPadding(false);
         appScroll.setPadding(0, 0, 0, dp(120));
@@ -4822,7 +4822,6 @@ public final class MainActivity extends Activity {
             @Override public void onBeginningOfSpeech() {
                 aiSpeechStartedAt = android.os.SystemClock.uptimeMillis();
                 aiSpeechPeakRms = 0f;
-                if (callMode && aiVoiceCallSpeaking) interruptAiVoiceCallSpeech();
             }
             @Override public void onRmsChanged(float rmsdB) {
                 if (rmsdB > aiSpeechPeakRms) aiSpeechPeakRms = rmsdB;
@@ -4853,13 +4852,13 @@ public final class MainActivity extends Activity {
             @Override public void onResults(Bundle results) {
                 aiVoiceCallListening = false;
                 if (aiMicButton != null) aiMicButton.setAlpha(1f);
-                if (callMode && aiVoiceCallSpeaking) {
-                    interruptAiVoiceCallSpeech();
-                    return;
-                }
                 ArrayList<String> matches = results == null ? null
                         : results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                 String recognized = matches == null || matches.isEmpty() ? "" : matches.get(0);
+                if (callMode && aiVoiceCallSpeaking) {
+                    if (isUsableAiVoicePhrase(recognized, results)) interruptAiVoiceCallSpeech();
+                    return;
+                }
                 if (isUsableAiVoicePhrase(recognized, results)
                         && aiComposer != null && (!callMode || aiVoiceCallActive)) {
                     aiComposer.setText(recognized.trim());
@@ -4877,7 +4876,8 @@ public final class MainActivity extends Activity {
             @Override public void onPartialResults(Bundle partialResults) {
                 if (callMode && aiVoiceCallSpeaking && partialResults != null) {
                     ArrayList<String> partial = partialResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-                    if (partial != null && !partial.isEmpty() && !partial.get(0).trim().isEmpty()) {
+                    if (partial != null && !partial.isEmpty()
+                            && isUsableAiVoicePhrase(partial.get(0), partialResults)) {
                         interruptAiVoiceCallSpeech();
                     }
                 }
@@ -6301,6 +6301,22 @@ public final class MainActivity extends Activity {
 
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private final class FixedOuterScrollView extends ScrollView {
+        FixedOuterScrollView(android.content.Context context) {
+            super(context);
+        }
+
+        @Override public boolean onInterceptTouchEvent(MotionEvent event) {
+            if (showingAiChat) return false;
+            return super.onInterceptTouchEvent(event);
+        }
+
+        @Override public boolean onTouchEvent(MotionEvent event) {
+            if (showingAiChat) return false;
+            return super.onTouchEvent(event);
+        }
     }
 
     private LinearLayout.LayoutParams margin(int l, int t, int r, int b) {

@@ -4356,6 +4356,15 @@ public final class MainActivity extends Activity {
         aiConversationScroll.setFillViewport(true);
         aiConversationScroll.setVerticalScrollBarEnabled(false);
         aiConversationScroll.setBackgroundColor(Color.TRANSPARENT);
+        aiConversationScroll.setOnTouchListener((view, event) -> {
+            if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                view.getParent().requestDisallowInterceptTouchEvent(true);
+            } else if (event.getActionMasked() == MotionEvent.ACTION_UP
+                    || event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+                view.getParent().requestDisallowInterceptTouchEvent(false);
+            }
+            return false;
+        });
         aiConversationBox = new LinearLayout(this);
         aiConversationBox.setOrientation(LinearLayout.VERTICAL);
         aiConversationBox.setPadding(0, dp(16), 0, dp(16));
@@ -4427,6 +4436,9 @@ public final class MainActivity extends Activity {
         showingAiChat = true;
         homeTabPageVisible = true;
         appScroll.setPadding(0, 0, 0, 0);
+        appScroll.setOnScrollChangeListener((view, scrollX, scrollY, oldScrollX, oldScrollY) -> {
+            if (showingAiChat && scrollY != 0) appScroll.scrollTo(0, 0);
+        });
         showPage(page, animated);
     }
 
@@ -6264,7 +6276,7 @@ public final class MainActivity extends Activity {
             appScroll.setPadding(0, 0, 0, dp(120));
         }
         homeTabPageVisible = false;
-        showingAiChat = false;
+        showingAiChat = aiPage;
         if (dashboardFab != null && appRoot != null) {
             appRoot.removeView(dashboardFab);
             dashboardFab = null;

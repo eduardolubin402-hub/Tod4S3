@@ -2419,21 +2419,18 @@ public final class MainActivity extends Activity {
         header.addView(identity, identityLayout);
         header.addView(accountMenuButton(), new LinearLayout.LayoutParams(dp(50), dp(50)));
         bar.addView(header);
-        LinearLayout cloud = new LinearLayout(this);
-        cloud.setOrientation(LinearLayout.VERTICAL);
-        TextView cloudLabel = text("Nube ToDus", 12, true);
-        cloudLabel.setTextColor(primaryTextColor());
-        cloud.addView(cloudLabel, new LinearLayout.LayoutParams(0, -2, 1f));
-        TextView cloudValue = text("Uso de espacio y entregas", 10, false);
-        cloudValue.setTextColor(secondaryTextColor());
-        cloud.addView(cloudValue);
         LinearLayout cloudRow = new LinearLayout(this);
         cloudRow.setGravity(Gravity.CENTER_VERTICAL);
-        cloudRow.addView(cloud, new LinearLayout.LayoutParams(0, -2, 1f));
+        TextView cloudLabel = text("Nube ToDus", 12, true);
+        cloudLabel.setTextColor(primaryTextColor());
+        cloudRow.addView(cloudLabel, new LinearLayout.LayoutParams(0, -2, 1f));
+        TextView cloudValue = text("Uso de espacio y entregas", 10, false);
+        cloudValue.setTextColor(secondaryTextColor());
+        cloudRow.addView(cloudValue);
         bar.addView(cloudRow, margin(0, 9, 0, 0));
         View cloudProgress = new View(this);
         cloudProgress.setBackground(roundRect(accentColor(), 8, 0));
-        bar.addView(cloudProgress, new LinearLayout.LayoutParams(dp(110), dp(5)));
+        bar.addView(cloudProgress, margin(0, 7, 0, 0));
         return bar;
     }
 
@@ -3535,7 +3532,15 @@ public final class MainActivity extends Activity {
         popup.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         popup.setOutsideTouchable(true);
         popup.setClippingEnabled(false);
-        popup.setElevation(dp(18));
+        popup.setElevation(dp(24));
+        View drawerScrim = new View(this);
+        drawerScrim.setBackgroundColor(Color.argb(168, 0, 0, 0));
+        drawerScrim.setClickable(true);
+        appRoot.addView(drawerScrim, new FrameLayout.LayoutParams(-1, -1));
+        drawerScrim.setOnClickListener(v -> popup.dismiss());
+        popup.setOnDismissListener(() -> {
+            if (drawerScrim.getParent() == appRoot) appRoot.removeView(drawerScrim);
+        });
         if (token == null || token.isEmpty()) {
             account.setOnClickListener(v -> {
                 popup.dismiss();
@@ -3619,6 +3624,10 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams labelsLayout = new LinearLayout.LayoutParams(0, -2, 1f);
         labelsLayout.setMargins(dp(8), 0, 0, 0);
         row.addView(label, labelsLayout);
+        TextView chevron = text("›", 20, true);
+        chevron.setTextColor(logout || active ? Color.rgb(255, 102, 123) : secondaryTextColor());
+        chevron.setGravity(Gravity.CENTER);
+        row.addView(chevron, new LinearLayout.LayoutParams(dp(22), dp(32)));
         row.setOnClickListener(v -> {
             popup.dismiss();
             action.run();

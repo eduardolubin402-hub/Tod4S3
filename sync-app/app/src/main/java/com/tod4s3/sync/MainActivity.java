@@ -6400,6 +6400,17 @@ public final class MainActivity extends Activity {
     private void updateQuotaUsageCard() {
         if (quotaUsageBox == null) return;
         boolean freePlan = "free".equals(activePlan);
+        // Premium es ilimitado: no dibujar un panel de consumo vacío debajo del encabezado.
+        // La barra de Nube ToDus de la cabecera ya comunica el estado sin reservar altura extra.
+        if (!freePlan) {
+            quotaUsageBox.removeAllViews();
+            quotaUsageBox.setVisibility(View.GONE);
+            quotaUsageBox.setTag(null);
+            quotaProgressBar = null;
+            quotaUsageText = null;
+            quotaResetText = null;
+            return;
+        }
         if (token == null || token.isEmpty() || (freePlan && freeQuotaLimitBytes <= 0)) {
             quotaUsageBox.removeAllViews();
             quotaUsageBox.setVisibility(View.GONE);

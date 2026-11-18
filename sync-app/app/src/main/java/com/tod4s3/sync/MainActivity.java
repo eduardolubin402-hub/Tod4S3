@@ -4440,6 +4440,16 @@ public final class MainActivity extends Activity {
             if (showingAiChat && scrollY != 0) appScroll.scrollTo(0, 0);
         });
         showPage(page, animated);
+        appScroll.post(() -> {
+            if (!showingAiChat || page.getParent() != appScroll) return;
+            int visibleHeight = appScroll.getHeight();
+            if (visibleHeight <= 0) return;
+            page.setMinimumHeight(0);
+            FrameLayout.LayoutParams pageParams = (FrameLayout.LayoutParams) page.getLayoutParams();
+            pageParams.width = -1;
+            pageParams.height = visibleHeight;
+            page.setLayoutParams(pageParams);
+        });
     }
 
     private FrameLayout createAiOrb(int size, boolean large) {

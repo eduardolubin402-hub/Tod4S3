@@ -96,7 +96,7 @@ import javax.crypto.spec.GCMParameterSpec;
 
 public final class MainActivity extends Activity {
     private static final String API_BASE = "https://tod4s3-production-abe8925f.up.railway.app";
-    private static final String UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/web/android-update.json";
+    private static final String UPDATE_MANIFEST_URL = "https://github.com/eduardolubin402-hub/Tod4S3/raw/refs/heads/main/web/android-update.json";
     private static final String LOG_TAG = "Tod4S3Sync";
     private static final String KEY_ALIAS = "tod4s3.sync.todus.credentials.v1";
     private static final String PREF_TODUS_PHONE = "todus_phone_enc";
@@ -1425,7 +1425,12 @@ public final class MainActivity extends Activity {
                     wallpaperImageView.setContentDescription("Fondo de pantalla personalizado");
                     appRoot.addView(wallpaperImageView, new FrameLayout.LayoutParams(-1, -1));
                     wallpaperScrim = new View(this);
-                    int dim = prefs.getInt(PREF_WALLPAPER_DIM, isDarkTheme() ? 42 : 24);
+                    // Los fondos guardados no deben dominar el dashboard ni teñir de rojo
+                    // la pantalla al entrar en Descargas. Las versiones anteriores podían
+                    // conservar un valor de 42%, dejando la imagen casi sin oscurecer.
+                    int savedDim = prefs.getInt(PREF_WALLPAPER_DIM, isDarkTheme() ? 88 : 72);
+                    int dim = isDarkTheme() ? Math.max(84, Math.min(94, savedDim))
+                            : Math.max(64, Math.min(86, savedDim));
                     int shade = isDarkTheme() ? Color.BLACK : Color.WHITE;
                     wallpaperScrim.setBackgroundColor(Color.argb(Math.max(0, Math.min(75, dim)) * 255 / 100,
                             Color.red(shade), Color.green(shade), Color.blue(shade)));

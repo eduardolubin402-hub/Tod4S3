@@ -1,7 +1,8 @@
 {
-  "version_code": 104,
-  "version_name": "1.5.59",
-  "manifest_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/web/android-update.json",
-  "apk_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/Tod4S3-Sync-v1.5.59.apk",
-  "sha256": "db7ed877dbbf19e4349d67121c9d2651a7b77692469a9ac20074ccc6aa63b0c8"
+  "version_code": 105,
+  "version_name": "1.5.60",
+  "manifest_url": "https://github.com/eduardolubin402-hub/Tod4S3/raw/refs/heads/main/web/android-update.json",
+  "apk_url": "https://github.com/eduardolubin402-hub/Tod4S3/raw/refs/heads/main/Tod4S3-Sync-v1.5.60.apk",
+  "sha256": "b6ab8fbcaa2d3f3d54c736c305001d3e46a358cef99df03e573157037aec7c1a",
+  "release_notes": "Corrección del fondo rojo intenso al entrar en Descargas y actualización del manifiesto para evitar caché antigua."
 }

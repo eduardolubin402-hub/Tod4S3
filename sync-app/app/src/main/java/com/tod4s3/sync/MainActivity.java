@@ -2439,7 +2439,11 @@ public final class MainActivity extends Activity {
         bar.addView(cloudRow, margin(0, 9, 0, 0));
         View cloudProgress = new View(this);
         cloudProgress.setBackground(roundRect(accentColor(), 8, 0));
-        bar.addView(cloudProgress, margin(0, 7, 0, 0));
+        // Una View sin contenido y con WRAP_CONTENT puede ocupar toda la altura
+        // disponible dentro del ScrollView. La barra debe ser siempre compacta.
+        LinearLayout.LayoutParams cloudProgressLayout = new LinearLayout.LayoutParams(-1, dp(6));
+        cloudProgressLayout.setMargins(0, dp(7), 0, 0);
+        bar.addView(cloudProgress, cloudProgressLayout);
         return bar;
     }
 

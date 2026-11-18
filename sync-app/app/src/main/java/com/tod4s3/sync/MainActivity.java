@@ -1337,7 +1337,7 @@ public final class MainActivity extends Activity {
         orbit.setIndeterminateTintList(ColorStateList.valueOf(Color.rgb(242, 30, 58)));
         emblem.addView(orbit, new FrameLayout.LayoutParams(dp(158), dp(158), Gravity.CENTER));
         ImageView logo = new ImageView(this);
-        logo.setImageResource(R.drawable.tod4s3_logo);
+        logo.setImageResource(R.drawable.ic_launch_logo);
         logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
         logo.setFilterTouchesWhenObscured(false);
         logo.setContentDescription("Logo de Tod4S3 Sync, descarga en curso");
@@ -4419,9 +4419,10 @@ public final class MainActivity extends Activity {
         aiComposer.setOnEditorActionListener((view, actionId, event) -> { if (actionId == EditorInfo.IME_ACTION_SEND) { sendAiMessage(); return true; } return false; });
         loadAiChatHistory();
         renderAiConversation();
-        showPage(page, animated);
         showingAiChat = true;
         homeTabPageVisible = true;
+        appScroll.setPadding(0, 0, 0, 0);
+        showPage(page, animated);
     }
 
     private FrameLayout createAiOrb(int size, boolean large) {
@@ -5184,7 +5185,12 @@ public final class MainActivity extends Activity {
                         && aiConversationBox != null) {
                     if (finalReply != null) {
                         aiChatStatus.setText("ESCRIBIENDO RESPUESTA");
-                        if (aiVoiceCallActive) setAiVoiceCallStatus("PREPARANDO RESPUESTA…");
+                        if (aiVoiceCallActive) {
+                            setAiVoiceCallStatus("AiTod4S3 ESTÁ HABLANDO…");
+                            aiChatRequestInFlight = false;
+                            stopAiThinkingTimeline();
+                            speakAiReply(finalReply);
+                        }
                         setAiActivityState("AiTod4S3 está redactando…", false, true);
                         aiChatMessages.add(new AiChatMessage("assistant", ""));
                         renderAiConversation();
@@ -5240,7 +5246,7 @@ public final class MainActivity extends Activity {
         if (aiChatMessages.size() > 24) aiChatMessages.subList(0, aiChatMessages.size() - 24).clear();
         persistAiChatHistory();
         renderAiConversation();
-        if (prefs != null && prefs.getBoolean(PREF_AI_VOICE_MODE, false)) {
+        if (!aiVoiceCallActive && prefs != null && prefs.getBoolean(PREF_AI_VOICE_MODE, false)) {
             aiChatStatus.setText("RESPUESTA LISTA · INICIANDO VOZ");
             speakAiReply(reply);
         } else {
@@ -6168,6 +6174,9 @@ public final class MainActivity extends Activity {
     }
 
     private void showPage(LinearLayout page, boolean animated) {
+        if (!showingAiChat) {
+            appScroll.setPadding(0, 0, 0, dp(120));
+        }
         homeTabPageVisible = false;
         showingAiChat = false;
         if (dashboardFab != null && appRoot != null) {

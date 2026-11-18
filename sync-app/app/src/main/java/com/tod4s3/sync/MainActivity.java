@@ -275,6 +275,8 @@ public final class MainActivity extends Activity {
     private boolean aiVoiceCallMuted;
     private boolean aiVoiceCallSpeaking;
     private boolean aiVoiceCallBargeInListening;
+    private long aiSpeechStartedAt;
+    private float aiSpeechPeakRms;
     private FrameLayout aiLargeOrb;
     private ObjectAnimator aiSpeakingOrbAnimator;
     private Switch aiVoiceToggle;
@@ -4806,9 +4808,13 @@ public final class MainActivity extends Activity {
                 if (aiMicButton != null) aiMicButton.setAlpha(0.55f);
             }
             @Override public void onBeginningOfSpeech() {
+                aiSpeechStartedAt = android.os.SystemClock.uptimeMillis();
+                aiSpeechPeakRms = 0f;
                 if (callMode && aiVoiceCallSpeaking) interruptAiVoiceCallSpeech();
             }
-            @Override public void onRmsChanged(float rmsdB) { }
+            @Override public void onRmsChanged(float rmsdB) {
+                if (rmsdB > aiSpeechPeakRms) aiSpeechPeakRms = rmsdB;
+            }
             @Override public void onBufferReceived(byte[] buffer) { }
             @Override public void onEndOfSpeech() {
                 if (callMode && aiVoiceCallSpeaking) return;
@@ -4841,8 +4847,10 @@ public final class MainActivity extends Activity {
                 }
                 ArrayList<String> matches = results == null ? null
                         : results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-                if (matches != null && !matches.isEmpty() && aiComposer != null && (!callMode || aiVoiceCallActive)) {
-                    aiComposer.setText(matches.get(0));
+                String recognized = matches == null || matches.isEmpty() ? "" : matches.get(0);
+                if (isUsableAiVoicePhrase(recognized, results)
+                        && aiComposer != null && (!callMode || aiVoiceCallActive)) {
+                    aiComposer.setText(recognized.trim());
                     aiComposer.setSelection(aiComposer.length());
                     setAiVoiceMode(true);
                     if (callMode) aiVoiceCallWaitingForReply = true;
@@ -4871,6 +4879,25 @@ public final class MainActivity extends Activity {
         aiSpeechIntent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
         aiSpeechIntent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Habla con AiTod4S3");
         aiSpeechRecognizer.startListening(aiSpeechIntent);
+    }
+    private boolean isUsableAiVoicePhrase(String phrase, Bundle results) {
+        if (phrase == null) return false;
+        String normalized = phrase.toLowerCase(java.util.Locale.ROOT)
+                .replaceAll("[^a-záéíóúüñ0-9 ]", " ")
+                .replaceAll("\\s+", " ").trim();
+        if (normalized.isEmpty() || normalized.length() < 2) return false;
+        if (normalized.matches("(?:eh|ah|ajá|mmm+|mm+|uh+|um+|hm+|hmm+|oh+|em+)")) return false;
+        String[] words = normalized.split(" ");
+        if (words.length == 1 && normalized.length() < 3 && !"sí".equals(normalized)) return false;
+        long speechDuration = aiSpeechStartedAt <= 0 ? 1000L
+                : android.os.SystemClock.uptimeMillis() - aiSpeechStartedAt;
+        if (speechDuration < 180L && normalized.length() < 5) return false;
+        if (results != null) {
+            float[] confidence = results.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES);
+            if (confidence != null && confidence.length > 0 && confidence[0] < 0.30f
+                    && normalized.length() < 8) return false;
+        }
+        return true;
     }
     private void showAiVoiceCallDialog() {
         if (aiVoiceCallDialog != null && aiVoiceCallDialog.isShowing()) return;

@@ -218,6 +218,7 @@ public final class MainActivity extends Activity {
     private volatile int updateDeclineInFlightVersion;
     private View dashboardFab;
     private View dashboardBalanceFab;
+    private PopupWindow activeDrawerPopup;
     private boolean ussdBalanceRequestInFlight;
     private boolean awaitingSpeedOverlayPermission;
     private FrameLayout ussdLoadingOverlay;
@@ -577,8 +578,8 @@ public final class MainActivity extends Activity {
         rejectionCount.setTextColor(Color.rgb(255, 111, 132));
         rejectionTop.addView(rejectionCount);
         rejection.addView(rejectionTop);
-        TextView dots = text("●  ○  ○", 17, true);
-        dots.setTextColor(Color.rgb(242, 30, 58));
+        TextView dots = text("1 de 3 rechazos", 11, true);
+        dots.setTextColor(Color.rgb(255, 122, 137));
         rejection.addView(dots, margin(0, 2, 0, 0));
         content.addView(rejection, margin(0, 18, 0, 12));
         Button update = primaryButton("ACTUALIZAR AHORA");
@@ -1244,6 +1245,8 @@ public final class MainActivity extends Activity {
         appRoot.setBackground(themedBackground());
         appScroll = new ScrollView(this);
         appScroll.setFillViewport(true);
+        appScroll.setClipToPadding(false);
+        appScroll.setPadding(0, 0, 0, dp(120));
         appScroll.setBackgroundColor(backgroundColor());
         appRoot.addView(appScroll, new FrameLayout.LayoutParams(-1, -1));
         applyWallpaperBackground();
@@ -1574,7 +1577,8 @@ public final class MainActivity extends Activity {
                 verifiedPremium ? "Tu acceso Premium está verificado en este móvil."
                         : "Empieza gratis. Los planes Premium son opcionales.");
         if (token != null && !token.isEmpty()) {
-            Button returnToApp = secondaryButton("← Volver a mis archivos");
+            Button returnToApp = secondaryButton("Volver a mis archivos");
+        setButtonIcon(returnToApp, R.drawable.ic_arrow_back, Color.WHITE);
             returnToApp.setOnClickListener(v -> {
                 if (prefs.getBoolean(PREF_TODUS_PIN_REQUESTED, false)) showPinStep(true);
                 else showDashboard(planReturnFilter, true);
@@ -1593,7 +1597,7 @@ public final class MainActivity extends Activity {
             active.setPadding(dp(15), dp(14), dp(15), dp(14));
             active.setBackground(roundRect(isDarkTheme() ? Color.rgb(18, 42, 42) : Color.rgb(231, 247, 240),
                     20, Color.rgb(52, 174, 148)));
-            TextView badge = text("✓  PREMIUM ACTIVO", 12, true);
+            TextView badge = text("PREMIUM ACTIVO", 12, true);
             badge.setTextColor(isDarkTheme() ? Color.rgb(99, 230, 190) : Color.rgb(23, 126, 91));
             active.addView(badge);
             active.addView(text("AiTod4S3 y tus funciones Premium están disponibles", 17, true), margin(0, 7, 0, 0));
@@ -2365,9 +2369,12 @@ public final class MainActivity extends Activity {
         header.addView(menu, new LinearLayout.LayoutParams(dp(50), dp(48)));
         LinearLayout identity = new LinearLayout(this);
         identity.setOrientation(LinearLayout.VERTICAL);
+        identity.setGravity(Gravity.CENTER);
         TextView title = text("Tod4S3 Sync", 18, true);
+        title.setGravity(Gravity.CENTER);
         identity.addView(title);
-        TextView status = text((premiumActive ? "● Premium activo" : "● Plan gratuito") + "  ·  v" + appVersion(), 11, false);
+        TextView status = text((premiumActive ? "Premium activo" : "Plan gratuito") + "  ·  v" + appVersion(), 11, false);
+        status.setGravity(Gravity.CENTER);
         status.setTextColor(premiumActive ? Color.rgb(53, 220, 143) : secondaryTextColor());
         identity.addView(status, margin(0, 2, 0, 0));
         LinearLayout.LayoutParams identityLayout = new LinearLayout.LayoutParams(0, -2, 1f);
@@ -2381,6 +2388,8 @@ public final class MainActivity extends Activity {
     private LinearLayout dashboardTabs() {
         LinearLayout tabs = new LinearLayout(this);
         tabs.setOrientation(LinearLayout.HORIZONTAL);
+        tabs.setPadding(dp(4), dp(4), dp(4), dp(4));
+        tabs.setBackground(roundRect(Color.argb(18, 255, 255, 255), 16, Color.argb(35, 255, 255, 255)));
         addTextTab(tabs, "Entregas", "all".equals(dashboardFilter) || "active".equals(dashboardFilter),
                 () -> showDashboard("all", true), 1f);
         addTextTab(tabs, "Descargas", "completed".equals(dashboardFilter),
@@ -2392,8 +2401,9 @@ public final class MainActivity extends Activity {
                             Runnable action, float weight) {
         TextView item = text(label, 12, true);
         item.setGravity(Gravity.CENTER);
-        item.setBackground(roundRect(selected ? accentColor() : raisedSurfaceColor(), 18,
-                selected ? accentColor() : borderColor()));
+        item.setBackground(selected
+                ? gradientRect(new int[]{Color.rgb(255, 59, 87), Color.rgb(220, 26, 57)}, 14, 0)
+                : roundRect(Color.TRANSPARENT, 14, 0));
         item.setTextColor(selected ? onAccentColor() : secondaryTextColor());
         item.setClickable(true);
         item.setFocusable(true);
@@ -2410,7 +2420,7 @@ public final class MainActivity extends Activity {
             return false;
         });
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(44), weight);
-        params.setMargins(dp(4), dp(1), dp(4), dp(3));
+        params.setMargins(0, 0, 0, 0);
         parent.addView(item, params);
     }
 
@@ -2488,6 +2498,7 @@ public final class MainActivity extends Activity {
         if (dashboardBalanceFab != null) appRoot.removeView(dashboardBalanceFab);
         dashboardFab = null;
 
+        if (!premiumActive) {
         FrameLayout balance = new FrameLayout(this);
         GradientDrawable balanceCircle = new GradientDrawable();
         balanceCircle.setShape(GradientDrawable.OVAL);
@@ -2508,11 +2519,14 @@ public final class MainActivity extends Activity {
         balanceLayout.setMargins(0, 0, dp(20), dp(98));
         appRoot.addView(balance, balanceLayout);
         dashboardBalanceFab = balance;
+        }
 
         FrameLayout ai = new FrameLayout(this);
         GradientDrawable aiCircle = new GradientDrawable();
         aiCircle.setShape(GradientDrawable.OVAL);
-        aiCircle.setColor(Color.rgb(242, 30, 58));
+        aiCircle = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{Color.rgb(255, 59, 87), Color.rgb(193, 18, 46)});
+        aiCircle.setShape(GradientDrawable.OVAL);
         aiCircle.setStroke(dp(2), isDarkTheme() ? Color.rgb(67, 76, 96) : Color.WHITE);
         ai.setBackground(aiCircle);
         ai.setElevation(dp(12));
@@ -2521,11 +2535,11 @@ public final class MainActivity extends Activity {
         TextView aiLabel = text("IA", 15, true);
         aiLabel.setTextColor(Color.WHITE);
         aiLabel.setGravity(Gravity.CENTER);
-        ai.addView(aiLabel, new FrameLayout.LayoutParams(dp(54), dp(54), Gravity.CENTER));
+        ai.addView(aiLabel, new FrameLayout.LayoutParams(dp(72), dp(72), Gravity.CENTER));
         ai.setContentDescription("Abrir AiTod4S3");
         ai.setOnClickListener(v -> showAiChat(true));
-        FrameLayout.LayoutParams aiLayout = new FrameLayout.LayoutParams(dp(54), dp(54), Gravity.BOTTOM | Gravity.END);
-        aiLayout.setMargins(0, 0, dp(20), dp(24));
+        FrameLayout.LayoutParams aiLayout = new FrameLayout.LayoutParams(dp(72), dp(72), Gravity.BOTTOM | Gravity.END);
+        aiLayout.setMargins(0, 0, dp(20), dp(20));
         appRoot.addView(ai, aiLayout);
         dashboardFab = ai;
     }
@@ -3422,124 +3436,143 @@ public final class MainActivity extends Activity {
     }
 
     private void showNavigationDrawer(View anchor) {
-        LinearLayout content = new LinearLayout(this);
-        content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(12), dp(12), dp(12), dp(26));
-        content.setBackground(roundRect(surfaceColor(), 24, borderColor()));
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(12), dp(8), dp(12), dp(16));
+        panel.setBackground(roundRect(Color.rgb(10, 11, 16), 28, Color.argb(31, 255, 255, 255)));
+        panel.setClipToPadding(false);
+
         LinearLayout account = new LinearLayout(this);
         account.setGravity(Gravity.CENTER_VERTICAL);
-        account.setPadding(dp(9), dp(8), dp(9), dp(8));
-        account.setBackground(roundRect(raisedSurfaceColor(), 17, borderColor()));
-        FrameLayout badge = new FrameLayout(this);
-        GradientDrawable circle = new GradientDrawable();
-        circle.setShape(GradientDrawable.OVAL);
-        circle.setColor(accentColor());
-        badge.setBackground(circle);
-        TextView menuGlyph = text("☰", 20, true);
-        menuGlyph.setTextColor(onAccentColor());
-        menuGlyph.setGravity(Gravity.CENTER);
-        badge.addView(menuGlyph, new FrameLayout.LayoutParams(dp(40), dp(40), Gravity.CENTER));
-        account.addView(badge, new LinearLayout.LayoutParams(dp(40), dp(40)));
+        account.setPadding(dp(8), dp(8), dp(8), dp(8));
+        account.setBackground(roundRect(Color.argb(22, 255, 255, 255), 18, Color.argb(31, 255, 255, 255)));
+        FrameLayout avatar = new FrameLayout(this);
+        GradientDrawable avatarRing = new GradientDrawable();
+        avatarRing.setShape(GradientDrawable.OVAL);
+        avatarRing.setColor(Color.rgb(24, 22, 25));
+        avatarRing.setStroke(dp(2), Color.rgb(255, 211, 107));
+        avatar.setBackground(avatarRing);
+        ImageView avatarImage = new ImageView(this);
+        avatarImage.setImageResource(R.drawable.tod4s3_logo);
+        avatarImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        avatarImage.setPadding(dp(6), dp(6), dp(6), dp(6));
+        avatar.addView(avatarImage, new FrameLayout.LayoutParams(dp(44), dp(44), Gravity.CENTER));
+        loadTelegramProfilePhoto(avatarImage);
+        account.addView(avatar, new LinearLayout.LayoutParams(dp(44), dp(44)));
         LinearLayout accountText = new LinearLayout(this);
         accountText.setOrientation(LinearLayout.VERTICAL);
-        accountText.addView(text(token == null || token.isEmpty() ? "Bienvenido" : "Tod4S3 Sync", 14, true));
-        TextView linked = bodyText(token == null || token.isEmpty() ? "Toca para iniciar sesión" : accountPlanShortLabel());
-        linked.setTextSize(10);
-        linked.setSingleLine(true);
-        linked.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        accountText.addView(linked, margin(0, 3, 0, 0));
+        TextView accountTitle = text("Tod4S3 Sync", 21, true);
+        accountText.addView(accountTitle);
+        TextView chip = text(premiumActive ? "Premium activo" : "Plan gratuito", 11, true);
+        chip.setTextColor(Color.rgb(51, 220, 143));
+        chip.setGravity(Gravity.CENTER);
+        chip.setPadding(dp(9), dp(3), dp(9), dp(3));
+        chip.setBackground(roundRect(Color.argb(30, 53, 220, 143), 14, Color.rgb(42, 131, 91)));
+        accountText.addView(chip, margin(0, 4, 0, 0));
         LinearLayout.LayoutParams accountTextLayout = new LinearLayout.LayoutParams(0, -2, 1f);
         accountTextLayout.setMargins(dp(12), 0, 0, 0);
         account.addView(accountText, accountTextLayout);
-        TextView accountAction = text(token == null || token.isEmpty() ? "+" : "↻", 18, true);
-        accountAction.setTextColor(accentColor());
-        account.addView(accountAction, new LinearLayout.LayoutParams(dp(34), dp(38)));
-        content.addView(account, margin(0, 0, 0, 9));
+        ImageView refresh = new ImageView(this);
+        refresh.setImageResource(R.drawable.ic_refresh);
+        refresh.setColorFilter(Color.rgb(255, 59, 87));
+        refresh.setPadding(dp(10), dp(10), dp(10), dp(10));
+        refresh.setContentDescription("Actualizar perfil");
+        refresh.setOnClickListener(v -> refreshAccountProfile());
+        account.addView(refresh, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        panel.addView(account, new LinearLayout.LayoutParams(-1, dp(70)));
 
-        Rect visibleFrame = new Rect();
-        if (appRoot != null) appRoot.getWindowVisibleDisplayFrame(visibleFrame);
-        int appWindowHeight = visibleFrame.height();
-        if (appWindowHeight <= 0) appWindowHeight = appRoot == null ? 0 : appRoot.getHeight();
-        if (appWindowHeight <= 0) appWindowHeight = getResources().getDisplayMetrics().heightPixels;
-        final int drawerHeight = Math.max(dp(320), appWindowHeight - dp(16));
+        LinearLayout rows = new LinearLayout(this);
+        rows.setOrientation(LinearLayout.VERTICAL);
+        rows.setPadding(0, dp(4), 0, dp(12));
         ScrollView drawerScroll = new ScrollView(this);
         drawerScroll.setFillViewport(true);
-        drawerScroll.setSmoothScrollingEnabled(true);
-        drawerScroll.setNestedScrollingEnabled(true);
-        drawerScroll.setFocusable(true);
-        drawerScroll.setClickable(true);
+        drawerScroll.setClipToPadding(false);
+        drawerScroll.setPadding(0, 0, 0, dp(8));
         drawerScroll.setVerticalScrollBarEnabled(true);
-        drawerScroll.setScrollbarFadingEnabled(false);
         drawerScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        drawerScroll.setBackgroundColor(Color.TRANSPARENT);
-        drawerScroll.addView(content, new ScrollView.LayoutParams(-1, -2));
-        int drawerWidth = Math.max(dp(240), Math.min(dp(304), getResources().getDisplayMetrics().widthPixels - dp(24)));
-        PopupWindow popup = new PopupWindow(drawerScroll, drawerWidth, drawerHeight, true);
-        popup.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-        popup.setOutsideTouchable(true);
-        popup.setClippingEnabled(false);
-        popup.setElevation(dp(24));
-        View drawerScrim = new View(this);
-        drawerScrim.setBackgroundColor(Color.argb(168, 0, 0, 0));
-        drawerScrim.setClickable(true);
-        appRoot.addView(drawerScrim, new FrameLayout.LayoutParams(-1, -1));
-        drawerScrim.setOnClickListener(v -> popup.dismiss());
-        popup.setOnDismissListener(() -> {
-            if (drawerScrim.getParent() == appRoot) appRoot.removeView(drawerScrim);
-        });
-        if (token == null || token.isEmpty()) {
-            account.setOnClickListener(v -> {
-                popup.dismiss();
-                if (prefs.getString(PREF_SELECTED_PLAN, "").isEmpty()) showPlansStep(true);
-                else showBotStep(true);
-            });
-        }
-        addDrawerSectionHeader(content, "Planes y archivos");
-        addDrawerRow(content, popup, "★", "Planes y ofertas", "Ver opciones y precios", () -> showPlansStep(true));
-        addDrawerRow(content, popup, "▣", "Archivos de ToDus", "Entregas del bot", () -> showDashboard("all", true));
-        addDrawerRow(content, popup, "⌁", "Vaciar mi nube", "Eliminar entregas remotas", () ->
+        drawerScroll.addView(rows, new ScrollView.LayoutParams(-1, -2));
+        panel.addView(drawerScroll, new LinearLayout.LayoutParams(-1, 0, 1f));
+
+        addDrawerSectionHeader(rows, "Planes y archivos");
+        addDrawerRow(rows, null, "", "Planes y ofertas", "Ver opciones y precios", () -> showPlansStep(true));
+        addDrawerRow(rows, null, "", "Archivos de ToDus", "Entregas del bot", () -> showDashboard("all", true));
+        addDrawerRow(rows, null, "", "Vaciar mi nube", "Eliminar entregas remotas", () ->
                 Toast.makeText(this, "Selecciona “Eliminar nube” en cada entrega para confirmar la eliminación.", Toast.LENGTH_LONG).show());
-        addDrawerRow(content, popup, "↓", "Descargas", "Archivos guardados en el teléfono", () -> showDashboard("completed", true));
+        addDrawerRow(rows, null, "", "Descargas", "Archivos guardados en el teléfono", () -> showDashboard("completed", true));
 
-        addDrawerSectionHeader(content, "Actividad");
-        addDrawerRow(content, popup, "◷", "Historial de transferencias", "Entregas y descargas anteriores", () -> showDashboard("completed", true));
-        addDrawerRow(content, popup, "ϟ", "Velocidad de red en pantalla", "Mostrar u ocultar el indicador", () -> showSettings(true));
-        addDrawerRow(content, popup, "▥", "Estadísticas", "Uso y actividad", () -> showStats(true));
-        if (token != null && !token.isEmpty()) {
-            addDrawerRow(content, popup, "▤", "Registros de la app", "Consultar actividad y errores", () -> showAppLogs(true));
-        }
+        addDrawerSectionHeader(rows, "Actividad");
+        addDrawerRow(rows, null, "", "Historial de transferencias", "Entregas y descargas anteriores", () -> showDashboard("completed", true));
+        addDrawerRow(rows, null, "", "Velocidad de red en pantalla", "Mostrar u ocultar el indicador", () -> showSettings(true));
+        addDrawerRow(rows, null, "", "Estadísticas", "Uso y actividad", () -> showStats(true));
+        if (token != null && !token.isEmpty()) addDrawerRow(rows, null, "", "Registros de la app", "Consultar actividad y errores", () -> showAppLogs(true));
 
-        addDrawerSectionHeader(content, "Ayuda y soporte");
-        addDrawerRow(content, popup, "◉", "Grupo de Telegram", "Dark Zone", () -> openExternalUrl("https://t.me/Dark_Zone_666"));
-        addDrawerRow(content, popup, "↗", "Enlace no disponible", "Reportar pedido caído", () -> shareReport("Pedido caído"));
-        addDrawerRow(content, popup, "⚠", "Reportar un error", "Enviar detalles al soporte", () -> shareReport("Error de Tod4S3 Sync"));
+        addDrawerSectionHeader(rows, "Ayuda y soporte");
+        addDrawerRow(rows, null, "", "Grupo de Telegram", "Dark Zone", () -> openExternalUrl("https://t.me/Dark_Zone_666"));
+        addDrawerRow(rows, null, "", "Reportar pedido caído", "Compartir un pedido que no abre", () -> shareReport("Pedido caído"));
+        addDrawerRow(rows, null, "", "Reportar un error", "Enviar detalles al soporte", () -> shareReport("Error de Tod4S3 Sync"));
 
-        addDrawerSectionHeader(content, "Preferencias y cuenta");
-        addDrawerRow(content, popup, "i", "Acerca de", "Versión y privacidad", () -> showAbout(true));
-        addDrawerRow(content, popup, "⚙", "Ajustes", "Tema, carpeta y almacenamiento", () -> showSettings(true));
-        if (token != null && !token.isEmpty()) {
-            addDrawerRow(content, popup, "↻", "Volver a vincular con el bot",
-                    "Renovar acceso de Telegram sin cerrar ToDus", () -> {
-                        relinkingBotAccount = true;
-                        showBotStep(true);
-                    });
-        }
-        addDrawerRow(content, popup, "↔", "Cambiar cuenta ToDus", "Conectar otro número", () ->
+        addDrawerSectionHeader(rows, "Preferencias y cuenta");
+        addDrawerRow(rows, null, "", "Acerca de", "Versión y privacidad", () -> showAbout(true));
+        addDrawerRow(rows, null, "", "Ajustes", "Tema, carpeta y almacenamiento", () -> showSettings(true));
+        if (token != null && !token.isEmpty()) addDrawerRow(rows, null, "", "Volver a vincular con el bot", "Renovar acceso de Telegram sin cerrar ToDus", () -> {
+            relinkingBotAccount = true;
+            showBotStep(true);
+        });
+        addDrawerRow(rows, null, "", "Cambiar cuenta ToDus", "Conectar otro número", () ->
                 new AlertDialog.Builder(this).setTitle("Cambiar cuenta ToDus")
                         .setMessage("Se quitará de este teléfono la sesión guardada de ToDus. Tus descargas no se borrarán.")
                         .setNegativeButton("Cancelar", null)
                         .setPositiveButton("Continuar", (dialog, which) -> changeToDusAccount()).show());
+
         if (token != null && !token.isEmpty()) {
-            addDrawerRow(content, popup, "⇥", "Cerrar sesión", "Desvincular este teléfono", this::confirmLogout);
+            Button logout = secondaryButton("Cerrar sesión");
+            logout.setTextColor(Color.rgb(255, 122, 137));
+            logout.setBackground(roundRect(Color.argb(23, 255, 59, 87), 16, Color.rgb(255, 59, 87)));
+            setButtonIcon(logout, R.drawable.ic_logout, Color.rgb(255, 122, 137));
+            logout.setOnClickListener(v -> {
+                if (activeDrawerPopup != null) activeDrawerPopup.dismiss();
+                confirmLogout();
+            });
+            panel.addView(logout, new LinearLayout.LayoutParams(-1, dp(48)));
         }
-        popup.showAtLocation(appRoot, Gravity.TOP | Gravity.START, dp(12), dp(8));
+
+        Rect visibleFrame = new Rect();
+        if (appRoot != null) appRoot.getWindowVisibleDisplayFrame(visibleFrame);
+        int statusInset = Math.max(0, visibleFrame.top);
+        int navInset = Math.max(0, getResources().getDisplayMetrics().heightPixels - visibleFrame.bottom);
+        int drawerHeight = Math.max(dp(360), visibleFrame.height() - dp(8) - navInset);
+        PopupWindow popup = new PopupWindow(panel, Math.max(dp(300), Math.min(dp(340), getResources().getDisplayMetrics().widthPixels - dp(24))), drawerHeight, true);
+        activeDrawerPopup = popup;
+        popup.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        popup.setOutsideTouchable(true);
+        popup.setClippingEnabled(true);
+        popup.setElevation(dp(24));
+        View drawerScrim = new View(this);
+        drawerScrim.setBackgroundColor(Color.argb(153, 0, 0, 0));
+        drawerScrim.setClickable(true);
+        appRoot.addView(drawerScrim, new FrameLayout.LayoutParams(-1, -1));
+        if (dashboardFab != null) dashboardFab.setVisibility(View.INVISIBLE);
+        if (dashboardBalanceFab != null) dashboardBalanceFab.setVisibility(View.INVISIBLE);
+        drawerScrim.setOnClickListener(v -> popup.dismiss());
+        popup.setOnDismissListener(() -> {
+            if (drawerScrim.getParent() == appRoot) appRoot.removeView(drawerScrim);
+            if (dashboardFab != null) dashboardFab.setVisibility(View.VISIBLE);
+            if (dashboardBalanceFab != null) dashboardBalanceFab.setVisibility(View.VISIBLE);
+            activeDrawerPopup = null;
+        });
+        if (token == null || token.isEmpty()) account.setOnClickListener(v -> {
+            popup.dismiss();
+            if (prefs.getString(PREF_SELECTED_PLAN, "").isEmpty()) showPlansStep(true); else showBotStep(true);
+        });
+        popup.showAtLocation(appRoot, Gravity.TOP | Gravity.START, dp(12), statusInset + dp(8));
     }
 
     private void addDrawerSectionHeader(LinearLayout parent, String label) {
-        TextView heading = text(label.toUpperCase(java.util.Locale.ROOT), 9, true);
+        TextView heading = text(label.toUpperCase(java.util.Locale.ROOT), 11, true);
+        heading.setTextSize(11.5f);
         heading.setTextColor(secondaryTextColor());
-        heading.setLetterSpacing(0.08f);
-        LinearLayout.LayoutParams params = margin(dp(5), 7, 0, 3);
+        heading.setLetterSpacing(0.15f);
+        LinearLayout.LayoutParams params = margin(dp(5), 14, 0, 8);
         parent.addView(heading, params);
     }
 
@@ -3548,51 +3581,72 @@ public final class MainActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(8), dp(6), dp(8), dp(6));
+        row.setPadding(dp(8), 0, dp(8), 0);
         boolean active = ("Planes y ofertas".equals(title) && showingPlansPage)
                 || ("Archivos de ToDus".equals(title) && viewingDashboard && !"completed".equals(dashboardFilter))
                 || ("Descargas".equals(title) && viewingDashboard && "completed".equals(dashboardFilter));
         boolean logout = "Cerrar sesión".equals(title);
-        row.setBackground(roundRect(logout ? Color.rgb(35, 12, 22)
-                        : (active ? Color.rgb(55, 22, 31) : raisedSurfaceColor()), 13,
-                logout || active ? Color.rgb(242, 30, 58) : borderColor()));
+        row.setBackground(roundRect(logout ? Color.argb(23, 255, 59, 87)
+                        : (active ? Color.argb(50, 255, 59, 87) : Color.argb(15, 255, 255, 255)), 14,
+                logout || active ? Color.rgb(255, 59, 87) : Color.argb(25, 255, 255, 255)));
         row.setElevation(dp(1));
         row.setContentDescription(title + ". " + subtitle);
+        if (active) {
+            View activeBar = new View(this);
+            activeBar.setBackground(roundRect(Color.rgb(255, 59, 87), 3, 0));
+            row.addView(activeBar, new LinearLayout.LayoutParams(dp(4), dp(28)));
+        }
         ImageView glyph = new ImageView(this);
         glyph.setImageResource(drawerIconResource(title));
         glyph.setColorFilter(logout ? Color.rgb(255, 122, 137) : accentColor());
         glyph.setPadding(dp(7), dp(7), dp(7), dp(7));
         glyph.setBackground(roundRect(logout || active ? Color.argb(92, 255, 59, 87) : Color.argb(34, 255, 59, 87), 12,
                 logout || active ? Color.rgb(255, 59, 87) : Color.TRANSPARENT));
-        row.addView(glyph, new LinearLayout.LayoutParams(dp(32), dp(32)));
-        TextView label = text(title, 12, true);
+        row.addView(glyph, new LinearLayout.LayoutParams(dp(30), dp(30)));
+        TextView label = text(title, 15, true);
+        label.setTextSize(15.5f);
         label.setSingleLine(true);
         label.setEllipsize(android.text.TextUtils.TruncateAt.END);
         LinearLayout.LayoutParams labelsLayout = new LinearLayout.LayoutParams(0, -2, 1f);
         labelsLayout.setMargins(dp(8), 0, 0, 0);
         row.addView(label, labelsLayout);
-        TextView chevron = text("›", 20, true);
-        chevron.setTextColor(logout || active ? Color.rgb(255, 102, 123) : secondaryTextColor());
-        chevron.setGravity(Gravity.CENTER);
-        row.addView(chevron, new LinearLayout.LayoutParams(dp(22), dp(32)));
+        if ("Velocidad de red en pantalla".equals(title)) {
+            Switch toggle = new Switch(this);
+            toggle.setButtonTintList(new ColorStateList(new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}},
+                    new int[]{Color.rgb(255, 59, 87), Color.rgb(92, 98, 119)}));
+            toggle.setChecked(prefs.getBoolean(PREF_SPEED_OVERLAY_ENABLED, false));
+            toggle.setOnCheckedChangeListener((button, checked) -> prefs.edit().putBoolean(PREF_SPEED_OVERLAY_ENABLED, checked).apply());
+            row.addView(toggle, new LinearLayout.LayoutParams(dp(50), dp(46)));
+        } else {
+            TextView chevron = text("›", 20, true);
+            chevron.setTextColor(logout || active ? Color.rgb(255, 122, 137) : secondaryTextColor());
+            chevron.setGravity(Gravity.CENTER);
+            row.addView(chevron, new LinearLayout.LayoutParams(dp(22), dp(46)));
+        }
         row.setOnClickListener(v -> {
-            popup.dismiss();
+            if (activeDrawerPopup != null) activeDrawerPopup.dismiss();
             action.run();
         });
-        parent.addView(row, margin(0, 0, 0, 4));
+        parent.addView(row, new LinearLayout.LayoutParams(-1, dp(46)));
+        LinearLayout.LayoutParams spacer = new LinearLayout.LayoutParams(-1, dp(6));
+        parent.addView(new View(this), spacer);
     }
 
     private int drawerIconResource(String title) {
         if (title.contains("Planes")) return R.drawable.ic_star;
         if (title.contains("Archivos")) return R.drawable.ic_inbox_delivery;
-        if (title.contains("nube")) return R.drawable.ic_cloud_download;
+        if (title.contains("nube")) return R.drawable.ic_cloud_off;
         if (title.contains("Descargas")) return R.drawable.ic_download_arrow;
-        if (title.contains("Historial")) return R.drawable.ic_refresh;
-        if (title.contains("Velocidad")) return R.drawable.ic_active_download;
-        if (title.contains("Registros")) return R.drawable.ic_file_card;
+        if (title.contains("Historial")) return R.drawable.ic_history;
+        if (title.contains("Velocidad")) return R.drawable.ic_speed;
+        if (title.contains("Estadísticas")) return R.drawable.ic_bar_chart;
+        if (title.contains("Registros")) return R.drawable.ic_description;
+        if (title.contains("Telegram")) return R.drawable.ic_send;
+        if (title.contains("pedido caído")) return R.drawable.ic_bug_report;
+        if (title.contains("error")) return R.drawable.ic_bug_report;
         if (title.contains("Acerca")) return R.drawable.ic_info;
         if (title.contains("Ajustes")) return R.drawable.ic_settings;
-        if (title.contains("Volver a vincular")) return R.drawable.ic_refresh;
+        if (title.contains("Volver a vincular")) return R.drawable.ic_sync;
         if (title.contains("Cambiar cuenta")) return R.drawable.ic_swap;
         if (title.contains("Cerrar sesión")) return R.drawable.ic_logout;
         return R.drawable.ic_info;
@@ -3602,7 +3656,8 @@ public final class MainActivity extends Activity {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        Button back = secondaryButton("←");
+        Button back = secondaryButton("");
+        setButtonIcon(back, R.drawable.ic_arrow_back, Color.WHITE);
         back.setTextSize(20);
         back.setOnClickListener(v -> showDashboard("all", true));
         bar.addView(back, new LinearLayout.LayoutParams(dp(46), dp(44)));
@@ -4188,7 +4243,8 @@ public final class MainActivity extends Activity {
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.setPadding(0, dp(2), 0, dp(6));
-        Button back = secondaryButton("← Volver");
+        Button back = secondaryButton("Volver");
+        setButtonIcon(back, R.drawable.ic_arrow_back, Color.WHITE);
         back.setTextSize(12);
         back.setMinHeight(dp(38));
         back.setOnClickListener(v -> {
@@ -4235,7 +4291,7 @@ public final class MainActivity extends Activity {
         chatOptions.setOnClickListener(this::showAiChatOptions);
         page.addView(header);
 
-        aiChatStatus = text("●  LISTA PARA AYUDAR", 9, true);
+        aiChatStatus = text("LISTA PARA AYUDAR", 9, true);
         aiChatStatus.setTextColor(Color.rgb(209, 221, 204));
         aiChatStatus.setSingleLine(true);
         aiChatStatus.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -4365,7 +4421,8 @@ public final class MainActivity extends Activity {
         aiComposer.setPadding(dp(12), dp(7), dp(12), dp(7));
         aiComposer.setBackground(roundRect(Color.TRANSPARENT, 22, 0));
         composerRow.addView(aiComposer, new LinearLayout.LayoutParams(0, dp(46), 1f));
-        aiSendButton = primaryButton("➤");
+        aiSendButton = primaryButton("");
+        setButtonIcon(aiSendButton, R.drawable.ic_send, Color.WHITE);
         aiSendButton.setTextSize(18);
         aiSendButton.setPadding(0, 0, 0, 0);
         aiSendButton.setMinHeight(0);
@@ -4436,7 +4493,7 @@ public final class MainActivity extends Activity {
                 if (aiChatThinkingBubbleLabel != null) {
                     aiChatThinkingBubbleLabel.setText(phase + "  ·  " + seconds + "s");
                 }
-                if (aiChatStatus != null) aiChatStatus.setText("●  " + phase.toUpperCase(java.util.Locale.ROOT));
+                if (aiChatStatus != null) aiChatStatus.setText(phase.toUpperCase(java.util.Locale.ROOT));
                 handler.postDelayed(this, 1000L);
             }
         };
@@ -4535,7 +4592,7 @@ public final class MainActivity extends Activity {
                         19, isDarkTheme() ? Color.rgb(54, 64, 88) : Color.rgb(222, 228, 242)));
             }
             bubble.setElevation(dp(3));
-            TextView author = text(userMessage ? "TÚ" : "✦  AiTod4S3", 10, true);
+            TextView author = text(userMessage ? "TÚ" : "AiTod4S3", 10, true);
             author.setTextColor(userMessage ? Color.rgb(151, 239, 228) : Color.rgb(241, 197, 111));
             bubble.addView(author, margin(0, 0, 0, 5));
             TextView body = text(message.content, 14, false);
@@ -4763,7 +4820,7 @@ public final class MainActivity extends Activity {
                     aiChatMessages.clear();
                     persistAiChatHistory();
                     renderAiConversation();
-                    if (aiChatStatus != null) aiChatStatus.setText("●  Conversación limpia");
+                    if (aiChatStatus != null) aiChatStatus.setText("Conversación limpia");
                 })
                 .show();
     }
@@ -4800,7 +4857,7 @@ public final class MainActivity extends Activity {
         startAiThinkingTimeline();
         aiSendButton.setEnabled(false);
         aiSendButton.setText("…");
-        aiChatStatus.setText("●  PREPARANDO TU RESPUESTA");
+        aiChatStatus.setText("PREPARANDO TU RESPUESTA");
         final int requestGeneration = appAccessGeneration;
         JSONArray messages = new JSONArray();
         int from = Math.max(0, aiChatMessages.size() - 12);
@@ -4865,7 +4922,7 @@ public final class MainActivity extends Activity {
                 if (currentToken.equals(token) && requestGeneration == appAccessGeneration && !appBanned
                         && aiConversationBox != null) {
                     if (finalReply != null) {
-                        aiChatStatus.setText("●  ESCRIBIENDO RESPUESTA");
+                        aiChatStatus.setText("ESCRIBIENDO RESPUESTA");
                         setAiActivityState("AiTod4S3 está redactando…", false, true);
                         aiChatMessages.add(new AiChatMessage("assistant", ""));
                         renderAiConversation();
@@ -4874,7 +4931,7 @@ public final class MainActivity extends Activity {
                         aiChatRequestInFlight = false;
                         stopAiThinkingTimeline();
                         String visibleFailure = finalFailure == null ? "No se pudo obtener una respuesta." : finalFailure;
-                        aiChatStatus.setText("●  NO SE PUDO RESPONDER");
+                        aiChatStatus.setText("NO SE PUDO RESPONDER");
                         setAiActivityState("Inténtalo de nuevo", false, false);
                         aiChatMessages.add(new AiChatMessage("assistant", visibleFailure));
                     }
@@ -4884,7 +4941,7 @@ public final class MainActivity extends Activity {
                 }
                 if (aiSendButton != null) {
                     aiSendButton.setEnabled(!aiChatRequestInFlight);
-                    if (!aiChatRequestInFlight) aiSendButton.setText("➤");
+                    if (!aiChatRequestInFlight) setButtonIcon(aiSendButton, R.drawable.ic_send, Color.WHITE);
                 }
             });
         }, "aitod4s3-chat").start();
@@ -4896,7 +4953,7 @@ public final class MainActivity extends Activity {
                 || requestGeneration != appAccessGeneration || isFinishing()) {
             aiChatRequestInFlight = false;
             stopAiThinkingTimeline();
-            if (aiSendButton != null) { aiSendButton.setEnabled(true); aiSendButton.setText("➤"); }
+            if (aiSendButton != null) { aiSendButton.setEnabled(true); setButtonIcon(aiSendButton, R.drawable.ic_send, Color.WHITE); }
             return;
         }
         AiChatMessage message = aiChatMessages.get(aiChatMessages.size() - 1);
@@ -4916,19 +4973,19 @@ public final class MainActivity extends Activity {
         persistAiChatHistory();
         renderAiConversation();
         if (prefs != null && prefs.getBoolean(PREF_AI_VOICE_MODE, false)) {
-            aiChatStatus.setText("●  RESPUESTA LISTA · INICIANDO VOZ");
+            aiChatStatus.setText("RESPUESTA LISTA · INICIANDO VOZ");
             speakAiReply(reply);
         } else {
-            aiChatStatus.setText("●  RESPUESTA LISTA");
+            aiChatStatus.setText("RESPUESTA LISTA");
             setAiActivityState("Respuesta lista", false, false);
         }
-        if (aiSendButton != null) { aiSendButton.setEnabled(true); aiSendButton.setText("➤"); }
+        if (aiSendButton != null) { aiSendButton.setEnabled(true); setButtonIcon(aiSendButton, R.drawable.ic_send, Color.WHITE); }
     }
 
     private void setAiVoiceMode(boolean enabled) {
         if (prefs != null) prefs.edit().putBoolean(PREF_AI_VOICE_MODE, enabled).apply();
         if (enabled) {
-            if (aiChatStatus != null) aiChatStatus.setText("●  PREPARANDO VOZ EN ESPAÑOL");
+            if (aiChatStatus != null) aiChatStatus.setText("PREPARANDO VOZ EN ESPAÑOL");
             setAiActivityState("Preparando voz en español…", false, true);
             ensureAiTextToSpeech();
         } else {
@@ -4937,7 +4994,7 @@ public final class MainActivity extends Activity {
             aiLastUtteranceId = "";
             if (aiTextToSpeech != null) aiTextToSpeech.stop();
             setAiActivityState("", false, false);
-            if (aiChatStatus != null) aiChatStatus.setText("●  MODO SOLO TEXTO ACTIVADO");
+            if (aiChatStatus != null) aiChatStatus.setText("MODO SOLO TEXTO ACTIVADO");
         }
     }
 
@@ -4965,7 +5022,7 @@ public final class MainActivity extends Activity {
                 aiTextToSpeech.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                     @Override public void onStart(String utteranceId) {
                         runOnUiThread(() -> {
-                            if (aiChatStatus != null) aiChatStatus.setText("●  AiTod4S3 ESTÁ HABLANDO");
+                            if (aiChatStatus != null) aiChatStatus.setText("AiTod4S3 ESTÁ HABLANDO");
                             setAiActivityState("AiTod4S3 está hablando…", true, true);
                         });
                     }
@@ -4975,7 +5032,7 @@ public final class MainActivity extends Activity {
                             runOnUiThread(() -> {
                                 aiLastUtteranceId = "";
                                 setAiActivityState("", false, false);
-                                if (aiChatStatus != null) aiChatStatus.setText("●  RESPUESTA HABLADA COMPLETA");
+                                if (aiChatStatus != null) aiChatStatus.setText("RESPUESTA HABLADA COMPLETA");
                             });
                         }
                     }
@@ -4985,7 +5042,7 @@ public final class MainActivity extends Activity {
                             runOnUiThread(() -> {
                                 aiLastUtteranceId = "";
                                 setAiActivityState("", false, false);
-                                if (aiChatStatus != null) aiChatStatus.setText("●  RESPUESTA DISPONIBLE POR TEXTO");
+                                if (aiChatStatus != null) aiChatStatus.setText("RESPUESTA DISPONIBLE POR TEXTO");
                             });
                         }
                     }
@@ -5062,7 +5119,7 @@ public final class MainActivity extends Activity {
             while (offset < textToSpeak.length() && Character.isWhitespace(textToSpeak.charAt(offset))) offset++;
         }
         aiLastUtteranceId = lastUtteranceId;
-        if (aiChatStatus != null) aiChatStatus.setText("●  AiTod4S3 ESTÁ HABLANDO");
+        if (aiChatStatus != null) aiChatStatus.setText("AiTod4S3 ESTÁ HABLANDO");
     }
 
     private static final class AiChatMessage {
@@ -5249,28 +5306,39 @@ public final class MainActivity extends Activity {
     private LinearLayout createStepPage(int activeStep, String title, String subtitle) {
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
-        page.setPadding(dp(20), dp(22), dp(20), dp(26));
-        LinearLayout brandHeader = new LinearLayout(this);
-        brandHeader.setOrientation(LinearLayout.HORIZONTAL);
-        brandHeader.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout identity = new LinearLayout(this);
-        identity.setOrientation(LinearLayout.VERTICAL);
-        TextView brand = text("Tod4S3", 30, true);
-        identity.addView(brand);
-        TextView product = text("SYNC  ·  ENTREGA PRIVADA", 11, true);
-        product.setTextColor(accentColor());
-        identity.addView(product, margin(0, 2, 0, 0));
-        brandHeader.addView(identity, new LinearLayout.LayoutParams(0, -2, 1f));
-        if (token != null && !token.isEmpty() && (activeStep == 0 || relinkingBotAccount)) {
-            brandHeader.addView(accountMenuButton());
-        }
-        page.addView(brandHeader, margin(0, 0, 0, 20));
+        page.setPadding(dp(20), dp(18), dp(20), dp(26));
+        LinearLayout topBar = new LinearLayout(this);
+        topBar.setGravity(Gravity.CENTER_VERTICAL);
+        Button back = secondaryButton("");
+        setButtonIcon(back, R.drawable.ic_arrow_back, Color.WHITE);
+        back.setContentDescription("Volver");
+        back.setOnClickListener(v -> navigateBackFromStep(activeStep));
+        topBar.addView(back, new LinearLayout.LayoutParams(dp(46), dp(46)));
+        TextView heading = text(title, 20, true);
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams headingParams = new LinearLayout.LayoutParams(0, dp(46), 1f);
+        headingParams.setMargins(dp(12), 0, 0, 0);
+        topBar.addView(heading, headingParams);
+        page.addView(topBar);
         if (activeStep > 0) addProgress(page, activeStep);
-        page.addView(text(title, 24, true), margin(0, 18, 0, 5));
         TextView subtitleText = bodyText(subtitle);
         subtitleText.setTextSize(13);
-        page.addView(subtitleText);
+        page.addView(subtitleText, margin(dp(58), 10, 0, 0));
         return page;
+    }
+
+    private void navigateBackFromStep(int activeStep) {
+        if (activeStep >= 3) {
+            showPhoneStep(true);
+        } else if (activeStep == 2) {
+            showBotStep(true);
+        } else if (activeStep == 1) {
+            showPlansStep(true);
+        } else if (token != null && !token.isEmpty()) {
+            showDashboard("all", true);
+        } else {
+            showPlansStep(true);
+        }
     }
 
     private FrameLayout accountMenuButton() {
@@ -6562,7 +6630,7 @@ public final class MainActivity extends Activity {
         heading.addView(titleGroup, titleGroupParams);
         String sessionLower = todusSessionStatusMessage == null ? "" : todusSessionStatusMessage.toLowerCase(java.util.Locale.ROOT);
         boolean sessionLooksActive = sessionLower.contains("conectada") || sessionLower.contains("restaurada");
-        TextView statusPill = text(sessionLooksActive ? "●  ACTIVA" : "●  REVISAR", 9, true);
+        TextView statusPill = text(sessionLooksActive ? "ACTIVA" : "REVISAR", 9, true);
         statusPill.setTextColor(sessionLooksActive ? Color.rgb(104, 236, 199) : Color.rgb(242, 198, 106));
         statusPill.setPadding(dp(8), dp(5), dp(8), dp(5));
         statusPill.setBackground(roundRect(Color.argb(55, 53, 193, 151), 20, Color.argb(105, 84, 215, 182)));
@@ -6616,13 +6684,12 @@ public final class MainActivity extends Activity {
                     JSONArray parts = deliveryParts(row);
                     int partCount = parts.length();
                     if (partCount == 0) continue;
+                    boolean isNewDelivery = row.optBoolean("is_new", false);
                     LinearLayout card = new LinearLayout(this);
                     card.setOrientation(LinearLayout.VERTICAL);
                     card.setPadding(dp(14), dp(12), dp(14), dp(12));
-                    GradientDrawable cardBackground = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                            new int[]{surfaceColor(), raisedSurfaceColor()});
-                    cardBackground.setCornerRadius(dp(18));
-                    cardBackground.setStroke(dp(1), borderColor());
+                    GradientDrawable cardBackground = roundRect(Color.argb(13, 255, 255, 255), 26,
+                            isNewDelivery ? Color.rgb(255, 59, 87) : Color.argb(31, 255, 255, 255));
                     card.setBackground(cardBackground);
                     card.setElevation(dp(1));
                     String partLabel = partCount == 1 ? "1 parte" : partCount + " partes";
@@ -6634,9 +6701,6 @@ public final class MainActivity extends Activity {
                     LinearLayout fileInfo = new LinearLayout(this);
                     fileInfo.setOrientation(LinearLayout.VERTICAL);
                     fileInfo.setGravity(Gravity.CENTER_VERTICAL);
-                    TextView source = text("ENTREGA DEL BOT", 9, true);
-                    source.setTextColor(accentColor());
-                    fileInfo.addView(source);
                     TextView fileName = text(name, 14, true);
                     fileName.setSingleLine(true);
                     fileName.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -6648,16 +6712,29 @@ public final class MainActivity extends Activity {
                     LinearLayout.LayoutParams fileInfoLayout = new LinearLayout.LayoutParams(0, -2, 1f);
                     fileInfoLayout.setMargins(dp(10), 0, 0, 0);
                     fileHeader.addView(fileInfo, fileInfoLayout);
-                    if (!taskId.isEmpty()) {
-                        Button hide = secondaryButton("Ocultar");
-                        hide.setTextSize(11);
-                        hide.setMinHeight(dp(36));
-                        hide.setPadding(dp(8), dp(2), dp(8), dp(2));
-                        hide.setOnClickListener(v -> confirmHideDelivery(taskId, name));
-                        LinearLayout.LayoutParams hideLayout = new LinearLayout.LayoutParams(-2, dp(36));
-                        hideLayout.setMargins(dp(7), 0, 0, 0);
-                        fileHeader.addView(hide, hideLayout);
+                    LinearLayout chips = new LinearLayout(this);
+                    chips.setGravity(Gravity.CENTER_VERTICAL);
+                    TextView sourceChip = text("ENTREGA DEL BOT", 9, true);
+                    sourceChip.setTextColor(Color.rgb(216, 221, 233));
+                    sourceChip.setGravity(Gravity.CENTER);
+                    sourceChip.setPadding(dp(8), dp(4), dp(8), dp(4));
+                    sourceChip.setBackground(roundRect(Color.argb(24, 255, 255, 255), 14, Color.argb(30, 255, 255, 255)));
+                    chips.addView(sourceChip);
+                    TextView partChip = text(partLabel, 9, true);
+                    partChip.setTextColor(Color.rgb(216, 221, 233));
+                    partChip.setGravity(Gravity.CENTER);
+                    partChip.setPadding(dp(8), dp(4), dp(8), dp(4));
+                    partChip.setBackground(roundRect(Color.argb(24, 255, 255, 255), 14, Color.argb(30, 255, 255, 255)));
+                    chips.addView(partChip, margin(4, 0, 0, 0));
+                    if (isNewDelivery) {
+                        TextView newChip = text("NUEVA", 9, true);
+                        newChip.setTextColor(Color.rgb(255, 122, 137));
+                        newChip.setGravity(Gravity.CENTER);
+                        newChip.setPadding(dp(8), dp(4), dp(8), dp(4));
+                        newChip.setBackground(roundRect(Color.argb(24, 255, 59, 87), 14, Color.rgb(255, 59, 87)));
+                        chips.addView(newChip, margin(4, 0, 0, 0));
                     }
+                    fileHeader.addView(chips);
                     card.addView(fileHeader);
                     View divider = new View(this);
                     divider.setBackgroundColor(borderColor());
@@ -6676,8 +6753,7 @@ public final class MainActivity extends Activity {
                     card.addView(progressBar, progressLayout);
                     LinearLayout cloudActions = new LinearLayout(this);
                     cloudActions.setOrientation(LinearLayout.HORIZONTAL);
-                    Button download = primaryButton(partCount > 1
-                            ? "Descargar y unir · " + partCount : "Descargar");
+                    Button download = primaryButton(partCount > 1 ? "Descargar y unir" : "Descargar");
                     download.setTextSize(13);
                     download.setMinHeight(dp(46));
                     download.setPadding(dp(10), dp(5), dp(10), dp(5));
@@ -6686,12 +6762,21 @@ public final class MainActivity extends Activity {
                     final String copyName = name;
                     final long copySize = size;
                     download.setOnClickListener(v -> startToDusDelivery(taskId, copyName, copy, copySize));
-                    cloudActions.addView(download, new LinearLayout.LayoutParams(0, -2, 1f));
+                    cloudActions.addView(download, new LinearLayout.LayoutParams(0, dp(48), 1.2f));
+                    if (!taskId.isEmpty()) {
+                        Button hide = secondaryButton("Ocultar");
+                        hide.setTextSize(11);
+                        hide.setMinHeight(dp(48));
+                        hide.setOnClickListener(v -> confirmHideDelivery(taskId, name));
+                        cloudActions.addView(hide, new LinearLayout.LayoutParams(0, dp(48), 0.62f));
+                    }
                     if (!taskId.isEmpty() && (cloudDeletable || todusDeletable)) {
                         Button deleteCloud = secondaryButton(todusDeletable ? "Eliminar entrega" : "Eliminar nube");
                         deleteCloud.setTextSize(12);
-                        deleteCloud.setMinHeight(dp(46));
-                        LinearLayout.LayoutParams deleteLayout = new LinearLayout.LayoutParams(0, -2, 0.85f);
+                        deleteCloud.setTextColor(Color.rgb(255, 122, 137));
+                        deleteCloud.setBackground(roundRect(Color.argb(23, 255, 59, 87), 16, Color.rgb(255, 59, 87)));
+                        deleteCloud.setMinHeight(dp(48));
+                        LinearLayout.LayoutParams deleteLayout = new LinearLayout.LayoutParams(0, dp(48), 1f);
                         deleteLayout.setMargins(dp(8), 0, 0, 0);
                         cloudActions.addView(deleteCloud, deleteLayout);
                         deleteCloud.setOnClickListener(v -> confirmDeleteCloudDelivery(taskId, copyName, todusDeletable));

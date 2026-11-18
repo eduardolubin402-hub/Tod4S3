@@ -3,6 +3,5 @@
   "version_name": "1.5.56",
   "manifest_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/web/android-update.json",
   "apk_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/Tod4S3-Sync-v1.5.56.apk",
-  "sha256": "87affbea319a292541b097b8aa5d9d6b2845fb9073144025f5198f3f16bd6101",
-  "release_notes": "Logo oficial Tod4S3, hoja de actualización visual, menú lateral, cuota, planes, vinculación, descargas y AiTod4S3 alineados con las referencias."
+  "sha256": "87affbea319a292541b097b8aa5d9d6b2845fb9073144025f5198f3f16bd6101"
 }

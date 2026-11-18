@@ -263,11 +263,16 @@ public final class MainActivity extends Activity {
     private ImageButton aiSendButton;
     private ImageButton aiCallButton;
     private View aiMicButton;
+    private Dialog aiVoiceCallDialog;
+    private TextView aiVoiceCallStatus;
+    private FrameLayout aiVoiceCallOrb;
+    private ObjectAnimator aiVoiceCallOrbAnimator;
     private SpeechRecognizer aiSpeechRecognizer;
     private Intent aiSpeechIntent;
     private boolean aiVoiceCallActive;
     private boolean aiVoiceCallListening;
     private boolean aiVoiceCallWaitingForReply;
+    private boolean aiVoiceCallMuted;
     private FrameLayout aiLargeOrb;
     private ObjectAnimator aiSpeakingOrbAnimator;
     private Switch aiVoiceToggle;
@@ -618,7 +623,7 @@ public final class MainActivity extends Activity {
         dialog.show();
         Window window = dialog.getWindow();
         if (window != null) {
-            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            window.setBackgroundDrawable(new ColorDrawable(Color.rgb(10, 11, 16)));
             window.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT);
             window.setGravity(Gravity.BOTTOM);
             WindowManager.LayoutParams updateParams = window.getAttributes();
@@ -851,13 +856,13 @@ public final class MainActivity extends Activity {
         updateDownloadDialog.show();
         Window dialogWindow = updateDownloadDialog.getWindow();
         if (dialogWindow != null) {
-            dialogWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            dialogWindow.setBackgroundDrawable(new ColorDrawable(Color.rgb(16, 18, 26)));
             dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
             WindowManager.LayoutParams windowParams = dialogWindow.getAttributes();
             windowParams.width = WindowManager.LayoutParams.MATCH_PARENT;
             windowParams.height = WindowManager.LayoutParams.WRAP_CONTENT;
             windowParams.gravity = Gravity.BOTTOM;
-            windowParams.dimAmount = 0.72f;
+            windowParams.dimAmount = 0.84f;
             dialogWindow.setAttributes(windowParams);
         }
         content.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(240)
@@ -1334,8 +1339,9 @@ public final class MainActivity extends Activity {
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.drawable.tod4s3_logo);
         logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        logo.setFilterTouchesWhenObscured(false);
         logo.setContentDescription("Logo de Tod4S3 Sync, descarga en curso");
-        FrameLayout.LayoutParams logoLayout = new FrameLayout.LayoutParams(dp(92), dp(92), Gravity.CENTER);
+        FrameLayout.LayoutParams logoLayout = new FrameLayout.LayoutParams(dp(104), dp(104), Gravity.CENTER);
         emblem.addView(logo, logoLayout);
         content.addView(emblem, new LinearLayout.LayoutParams(dp(172), dp(172)));
 
@@ -1364,10 +1370,8 @@ public final class MainActivity extends Activity {
         overlay.addView(content, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
         appRoot.addView(overlay, new FrameLayout.LayoutParams(-1, -1));
         launchSplashOverlay = overlay;
-        logo.setScaleX(0.72f);
-        logo.setScaleY(0.72f);
         logo.setAlpha(0f);
-        logo.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(440L)
+        logo.animate().alpha(1f).setDuration(440L)
                 .setInterpolator(new DecelerateInterpolator()).start();
         content.setAlpha(0f);
         content.setTranslationY(dp(12));
@@ -4788,6 +4792,10 @@ public final class MainActivity extends Activity {
             @Override public void onReadyForSpeech(Bundle params) {
                 aiVoiceCallListening = callMode;
                 if (aiChatStatus != null) aiChatStatus.setText(callMode ? "LLAMADA · ESCUCHANDO" : "escuchando…");
+                if (callMode) {
+                    setAiVoiceCallStatus("ESCUCHANDO…");
+                    animateAiVoiceCallOrb(false);
+                }
                 if (aiMicButton != null) aiMicButton.setAlpha(0.55f);
             }
             @Override public void onBeginningOfSpeech() { }
@@ -4795,6 +4803,10 @@ public final class MainActivity extends Activity {
             @Override public void onBufferReceived(byte[] buffer) { }
             @Override public void onEndOfSpeech() {
                 if (callMode && aiChatStatus != null) aiChatStatus.setText("LLAMADA · PROCESANDO");
+                if (callMode) {
+                    setAiVoiceCallStatus("PROCESANDO LO QUE DIJISTE…");
+                    if (aiVoiceCallOrbAnimator != null) aiVoiceCallOrbAnimator.cancel();
+                }
             }
             @Override public void onError(int error) {
                 aiVoiceCallListening = false;
@@ -4820,6 +4832,7 @@ public final class MainActivity extends Activity {
                     aiComposer.setSelection(aiComposer.length());
                     setAiVoiceMode(true);
                     if (callMode) aiVoiceCallWaitingForReply = true;
+                    if (callMode) setAiVoiceCallStatus("CONECTANDO CON LA IA…");
                     sendAiMessage();
                 } else if (callMode && aiVoiceCallActive && !aiChatRequestInFlight) {
                     handler.postDelayed(() -> {
@@ -4836,6 +4849,66 @@ public final class MainActivity extends Activity {
         aiSpeechIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "es");
         aiSpeechIntent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Habla con AiTod4S3");
         aiSpeechRecognizer.startListening(aiSpeechIntent);
+    }
+    private void showAiVoiceCallDialog() {
+        if (aiVoiceCallDialog != null && aiVoiceCallDialog.isShowing()) return;
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setGravity(Gravity.CENTER_HORIZONTAL);
+        content.setPadding(dp(26), dp(34), dp(26), dp(24));
+        content.setBackgroundColor(Color.rgb(7, 8, 12));
+        TextView eyebrow = text("LLAMADA DE VOZ", 11, true);
+        eyebrow.setTextColor(Color.rgb(255, 122, 137));
+        eyebrow.setGravity(Gravity.CENTER);
+        content.addView(eyebrow, new LinearLayout.LayoutParams(-1, -2));
+        content.addView(text("AiTod4S3", 29, true), margin(0, 7, 0, 3));
+        TextView hint = text("Habla normalmente. La IA te responderá en voz alta.", 13, false);
+        hint.setTextColor(Color.rgb(170, 176, 194));
+        hint.setGravity(Gravity.CENTER);
+        content.addView(hint, margin(0, 0, 0, 28));
+        aiVoiceCallOrb = createAiOrb(dp(150), true);
+        LinearLayout.LayoutParams orbParams = new LinearLayout.LayoutParams(dp(150), dp(150));
+        orbParams.gravity = Gravity.CENTER_HORIZONTAL;
+        content.addView(aiVoiceCallOrb, orbParams);
+        aiVoiceCallStatus = text("CONECTANDO…", 14, true);
+        aiVoiceCallStatus.setGravity(Gravity.CENTER);
+        aiVoiceCallStatus.setTextColor(Color.rgb(96, 226, 244));
+        content.addView(aiVoiceCallStatus, margin(0, 24, 0, 7));
+        TextView explanation = text("Escuchando → procesando → respondiendo", 12, false);
+        explanation.setGravity(Gravity.CENTER);
+        explanation.setTextColor(Color.rgb(138, 144, 166));
+        content.addView(explanation, margin(0, 0, 0, 28));
+        Button hangup = secondaryButton("FINALIZAR LLAMADA");
+        hangup.setTextColor(Color.WHITE);
+        hangup.setBackground(gradientRect(new int[]{Color.rgb(255, 59, 87), Color.rgb(193, 18, 46)}, 24, 0));
+        hangup.setOnClickListener(v -> stopAiVoiceCall());
+        content.addView(hangup, new LinearLayout.LayoutParams(-1, dp(54)));
+        aiVoiceCallDialog = new Dialog(this);
+        aiVoiceCallDialog.setContentView(content);
+        aiVoiceCallDialog.setCancelable(false);
+        aiVoiceCallDialog.show();
+        Window window = aiVoiceCallDialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.rgb(7, 8, 12)));
+            window.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+            window.setDimAmount(0.94f);
+        }
+    }
+    private void setAiVoiceCallStatus(String status) {
+        if (aiVoiceCallStatus != null) aiVoiceCallStatus.setText(status);
+    }
+    private void animateAiVoiceCallOrb(boolean speaking) {
+        if (aiVoiceCallOrb == null) return;
+        if (aiVoiceCallOrbAnimator != null) aiVoiceCallOrbAnimator.cancel();
+        aiVoiceCallOrbAnimator = ObjectAnimator.ofPropertyValuesHolder(
+                aiVoiceCallOrb,
+                android.animation.PropertyValuesHolder.ofFloat(View.SCALE_X, 1f, speaking ? 1.11f : 1.045f, 1f),
+                android.animation.PropertyValuesHolder.ofFloat(View.SCALE_Y, 1f, speaking ? 1.11f : 1.045f, 1f),
+                android.animation.PropertyValuesHolder.ofFloat(View.ALPHA, 1f, speaking ? 0.78f : 0.92f, 1f));
+        aiVoiceCallOrbAnimator.setDuration(speaking ? 620L : 1050L);
+        aiVoiceCallOrbAnimator.setRepeatCount(ObjectAnimator.INFINITE);
+        aiVoiceCallOrbAnimator.setInterpolator(new DecelerateInterpolator());
+        aiVoiceCallOrbAnimator.start();
     }
     private void toggleAiVoiceCall() {
         if (aiVoiceCallActive) {
@@ -4855,16 +4928,30 @@ public final class MainActivity extends Activity {
         }
         aiVoiceCallActive = true;
         aiVoiceCallWaitingForReply = false;
+        aiVoiceCallMuted = false;
         setAiVoiceMode(true);
         updateAiVoiceCallButton();
+        showAiVoiceCallDialog();
+        setAiVoiceCallStatus("CONECTANDO…");
         beginAiSpeechRecognition(true);
     }
     private void stopAiVoiceCall() {
         aiVoiceCallActive = false;
         aiVoiceCallListening = false;
         aiVoiceCallWaitingForReply = false;
+        aiVoiceCallMuted = false;
         if (aiSpeechRecognizer != null) aiSpeechRecognizer.cancel();
         if (aiTextToSpeech != null) aiTextToSpeech.stop();
+        if (aiVoiceCallDialog != null) {
+            aiVoiceCallDialog.dismiss();
+            aiVoiceCallDialog = null;
+            aiVoiceCallStatus = null;
+        }
+        if (aiVoiceCallOrbAnimator != null) {
+            aiVoiceCallOrbAnimator.cancel();
+            aiVoiceCallOrbAnimator = null;
+        }
+        aiVoiceCallOrb = null;
         updateAiVoiceCallButton();
         setAiVoiceMode(false);
         if (aiChatStatus != null) aiChatStatus.setText("en línea");
@@ -5027,6 +5114,7 @@ public final class MainActivity extends Activity {
         aiChatRequestInFlight = true;
         renderAiConversation();
         setAiActivityState("AiTod4S3 está escribiendo…", false, true);
+        if (aiVoiceCallActive) setAiVoiceCallStatus("AiTod4S3 ESTÁ PENSANDO…");
         startAiThinkingTimeline();
         aiSendButton.setEnabled(false);
         setAiImageIcon(aiSendButton, R.drawable.ic_pause, Color.WHITE);
@@ -5096,6 +5184,7 @@ public final class MainActivity extends Activity {
                         && aiConversationBox != null) {
                     if (finalReply != null) {
                         aiChatStatus.setText("ESCRIBIENDO RESPUESTA");
+                        if (aiVoiceCallActive) setAiVoiceCallStatus("PREPARANDO RESPUESTA…");
                         setAiActivityState("AiTod4S3 está redactando…", false, true);
                         aiChatMessages.add(new AiChatMessage("assistant", ""));
                         renderAiConversation();
@@ -5202,6 +5291,10 @@ public final class MainActivity extends Activity {
                     @Override public void onStart(String utteranceId) {
                         runOnUiThread(() -> {
                             if (aiChatStatus != null) aiChatStatus.setText("AiTod4S3 ESTÁ HABLANDO");
+                            if (aiVoiceCallActive) {
+                                setAiVoiceCallStatus("AiTod4S3 ESTÁ HABLANDO…");
+                                animateAiVoiceCallOrb(true);
+                            }
                             setAiActivityState("AiTod4S3 está hablando…", true, true);
                         });
                     }
@@ -5214,6 +5307,8 @@ public final class MainActivity extends Activity {
                                 if (aiVoiceCallActive) {
                                     aiVoiceCallWaitingForReply = false;
                                     if (aiChatStatus != null) aiChatStatus.setText("LLAMADA · ESCUCHANDO");
+                                    setAiVoiceCallStatus("ESCUCHANDO…");
+                                    animateAiVoiceCallOrb(false);
                                     handler.postDelayed(() -> {
                                         if (aiVoiceCallActive && !aiChatRequestInFlight) beginAiSpeechRecognition(true);
                                     }, 350L);
@@ -5232,6 +5327,8 @@ public final class MainActivity extends Activity {
                                 if (aiVoiceCallActive) {
                                     aiVoiceCallWaitingForReply = false;
                                     if (aiChatStatus != null) aiChatStatus.setText("LLAMADA · ESCUCHANDO");
+                                    setAiVoiceCallStatus("ESCUCHANDO…");
+                                    animateAiVoiceCallOrb(false);
                                     handler.postDelayed(() -> {
                                         if (aiVoiceCallActive && !aiChatRequestInFlight) beginAiSpeechRecognition(true);
                                     }, 350L);
@@ -7582,6 +7679,8 @@ public final class MainActivity extends Activity {
                 if (aiVoiceCallActive) {
                     setAiVoiceMode(true);
                     updateAiVoiceCallButton();
+                    showAiVoiceCallDialog();
+                    setAiVoiceCallStatus("CONECTANDO…");
                     beginAiSpeechRecognition(true);
                 } else {
                     startAiVoiceInput();

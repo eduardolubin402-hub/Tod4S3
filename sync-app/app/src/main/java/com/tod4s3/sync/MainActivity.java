@@ -1684,12 +1684,12 @@ public final class MainActivity extends Activity {
         offer.setTag("tod4s3_plan_card");
         offer.setPadding(dp(16), dp(15), dp(16), dp(15));
         int tierColor = isDarkTheme() ? Color.rgb(255, 204, 76) : Color.rgb(115, 77, 0);
-        int offerStart = isDarkTheme() ? Color.rgb(29, 25, 25) : Color.rgb(255, 255, 255);
-        int offerEnd = isDarkTheme() ? Color.rgb(35, 28, 30) : Color.rgb(245, 247, 251);
+        int offerStart = isDarkTheme() ? Color.rgb(18, 19, 26) : Color.rgb(255, 255, 255);
+        int offerEnd = isDarkTheme() ? Color.rgb(25, 27, 36) : Color.rgb(245, 247, 251);
         GradientDrawable offerBackground = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
                 new int[]{offerStart, offerEnd});
         offerBackground.setCornerRadius(dp(20));
-        offerBackground.setStroke(dp(1), isDarkTheme() ? Color.rgb(255, 204, 76) : Color.rgb(224, 183, 72));
+        offerBackground.setStroke(dp(1), isDarkTheme() ? Color.rgb(78, 82, 98) : Color.rgb(224, 183, 72));
         offer.setBackground(offerBackground);
         offer.setElevation(dp(3));
         LinearLayout offerHeader = new LinearLayout(this);
@@ -1775,12 +1775,16 @@ public final class MainActivity extends Activity {
         }
         LinearLayout form = new LinearLayout(this);
         form.setOrientation(LinearLayout.VERTICAL);
-        form.setPadding(dp(8), dp(6), dp(8), dp(2));
+        form.setPadding(dp(20), dp(18), dp(20), dp(16));
+        form.setBackground(roundRect(Color.rgb(10, 11, 16), 26, Color.argb(48, 255, 255, 255)));
+        TextView title = text("Ya soy premium", 22, true);
+        title.setGravity(Gravity.CENTER);
+        form.addView(title, margin(0, 0, 0, 12));
         FrameLayout medal = new FrameLayout(this);
         GradientDrawable medalBg = new GradientDrawable();
         medalBg.setShape(GradientDrawable.OVAL);
         medalBg.setColor(Color.TRANSPARENT);
-        medalBg.setStroke(dp(3), Color.rgb(255, 204, 76));
+        medalBg.setStroke(dp(3), Color.rgb(255, 211, 107));
         medal.setBackground(medalBg);
         ImageView star = new ImageView(this);
         star.setImageResource(R.drawable.ic_star);
@@ -1796,43 +1800,55 @@ public final class MainActivity extends Activity {
         TextView activationHint = bodyText("Pega el código secreto que te dio el vendedor");
         activationHint.setGravity(Gravity.CENTER);
         form.addView(activationHint, margin(0, 0, 0, 10));
-        form.addView(bodyText("Pega el código que te entregó el administrador. Solo sirve para tu ID de Telegram y este móvil."));
-        EditText codeField = input("Ejemplo: T4S3-…", android.text.InputType.TYPE_CLASS_TEXT
+        EditText codeField = input("Código secreto", android.text.InputType.TYPE_CLASS_TEXT
                 | android.text.InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
                 | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         codeField.setSingleLine(true);
-        codeField.setBackground(roundRect(Color.rgb(24, 24, 31), 14, Color.rgb(255, 204, 76)));
-        form.addView(codeField, margin(0, 10, 0, 6));
-        TextView warning = bodyText("✓  Se liga a este teléfono en el primer canje\n✓  No puede reutilizarse en otro móvil\n✓  Vence junto con tu plan\n✓  Lo verifica el servidor con tu cuenta");
+        codeField.setBackground(roundRect(Color.rgb(18, 19, 26), 18, Color.rgb(255, 211, 107)));
+        form.addView(codeField, margin(0, 8, 0, 8));
+        TextView warning = bodyText("Se liga a este teléfono en el primer canje\nNo puede reutilizarse en otro móvil\nVence junto con tu plan\nLo verifica el servidor con tu cuenta");
         warning.setTextSize(12);
-        warning.setPadding(dp(12), dp(10), dp(12), dp(10));
-        warning.setBackground(roundRect(Color.rgb(29, 27, 29), 15, Color.rgb(75, 67, 48)));
-        form.addView(warning, margin(0, 8, 0, 7));
+        warning.setPadding(dp(14), dp(12), dp(14), dp(12));
+        warning.setBackground(roundRect(Color.argb(23, 255, 211, 107), 16, Color.argb(92, 255, 211, 107)));
+        form.addView(warning, margin(0, 6, 0, 8));
         TextView status = bodyText("");
         status.setTextColor(Color.rgb(255, 205, 116));
-        form.addView(status);
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Ya soy Premium")
-                .setView(form)
-                .setNegativeButton("Cancelar", null)
-                .setPositiveButton("Verificar token", null)
-                .create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+        form.addView(status, margin(0, 0, 0, 10));
+        Button verify = goldButton("Validar código");
+        form.addView(verify, new LinearLayout.LayoutParams(-1, dp(54)));
+        Button cancel = secondaryButton("Cancelar");
+        form.addView(cancel, margin(0, 8, 0, 0));
+        Dialog dialog = new Dialog(this);
+        dialog.setContentView(form);
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(true);
+        verify.setOnClickListener(view -> {
             String code = codeField.getText().toString().trim();
             if (code.isEmpty()) {
                 status.setText("Pega el código que te entregó el administrador.");
                 return;
             }
-            verifyPremiumActivationToken(code, dialog, status);
-        }));
+            verifyPremiumActivationToken(code, dialog, status, verify);
+        });
+        cancel.setOnClickListener(v -> dialog.dismiss());
         dialog.show();
-        dialog.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams params = window.getAttributes();
+            params.width = Math.min(dp(430), getResources().getDisplayMetrics().widthPixels - dp(24));
+            params.height = WindowManager.LayoutParams.WRAP_CONTENT;
+            params.gravity = Gravity.BOTTOM;
+            params.dimAmount = 0.78f;
+            window.setAttributes(params);
+        }
     }
 
-    private void verifyPremiumActivationToken(String code, AlertDialog dialog, TextView status) {
+    private void verifyPremiumActivationToken(String code, Dialog dialog, TextView status, Button verifyButton) {
         final String currentToken = token == null ? "" : token;
         status.setText("Verificando el ID, el plan y este móvil…");
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
+        verifyButton.setEnabled(false);
         new Thread(() -> {
             try {
                 JSONObject body = new JSONObject().put("token", code.toUpperCase(java.util.Locale.ROOT));
@@ -1874,7 +1890,7 @@ public final class MainActivity extends Activity {
                         : "No se pudo verificar el código. Revisa la conexión e inténtalo de nuevo.";
                 runOnUiThread(() -> {
                     status.setText(message);
-                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true);
+                    verifyButton.setEnabled(true);
                 });
             }
         }, "premium-token-verify").start();
@@ -1904,66 +1920,68 @@ public final class MainActivity extends Activity {
     private void openPremiumRequest(String selectedPlan) {
         LinearLayout form = new LinearLayout(this);
         form.setOrientation(LinearLayout.VERTICAL);
-        form.setPadding(dp(8), dp(4), dp(8), dp(2));
+        form.setPadding(dp(18), dp(18), dp(18), dp(16));
+        form.setBackground(roundRect(Color.rgb(10, 11, 16), 26, Color.argb(48, 255, 255, 255)));
+        TextView title = text("Solicitar plan Premium", 22, true);
+        title.setGravity(Gravity.CENTER);
+        form.addView(title, margin(0, 0, 0, 12));
         LinearLayout steps = new LinearLayout(this);
         steps.setGravity(Gravity.CENTER);
-        String[] stepNames = {"1\nTus datos", "2\nChat directo", "3\nComprobante"};
+        String[] stepNames = {"Tus datos", "Chat directo", "Comprobante"};
         for (int i = 0; i < stepNames.length; i++) {
             TextView step = text(stepNames[i], 10, true);
             step.setGravity(Gravity.CENTER);
-            step.setTextColor(i == 0 ? Color.WHITE : Color.rgb(170, 170, 180));
-            step.setBackground(roundRect(i == 0 ? Color.rgb(242, 30, 58) : Color.rgb(28, 29, 37), 18,
-                    i == 0 ? Color.rgb(242, 30, 58) : Color.rgb(75, 75, 85)));
-            LinearLayout.LayoutParams stepParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
+            step.setTextColor(i == 0 ? Color.WHITE : Color.rgb(170, 175, 190));
+            step.setBackground(i == 0
+                    ? gradientRect(new int[]{Color.rgb(255, 59, 87), Color.rgb(220, 26, 57)}, 16, 0)
+                    : roundRect(Color.argb(23, 255, 255, 255), 16, Color.argb(35, 255, 255, 255)));
+            LinearLayout.LayoutParams stepParams = new LinearLayout.LayoutParams(0, dp(44), 1f);
             if (i > 0) stepParams.setMargins(dp(6), 0, 0, 0);
             steps.addView(step, stepParams);
         }
-        form.addView(steps, margin(0, 0, 0, 12));
-        form.addView(bodyText("Plan seleccionado: " + selectedPlan), margin(0, 0, 0, 12));
-
+        form.addView(steps, margin(0, 0, 0, 10));
+        TextView selected = bodyText("Plan seleccionado: " + selectedPlan);
+        selected.setTextColor(Color.rgb(255, 211, 107));
+        form.addView(selected, margin(0, 0, 0, 12));
         EditText nameInput = input("Tu nombre", android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS);
         form.addView(nameInput, margin(0, 0, 0, 8));
         EditText usernameInput = input("Usuario de Telegram (opcional)", android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_NORMAL);
         form.addView(usernameInput, margin(0, 0, 0, 10));
-
         TextView paymentLabel = text("Método de pago", 14, true);
-        paymentLabel.setTextColor(Color.rgb(176, 197, 211));
-        form.addView(paymentLabel, margin(0, 0, 0, 3));
+        form.addView(paymentLabel, margin(0, 0, 0, 4));
         RadioGroup paymentChoice = new RadioGroup(this);
         paymentChoice.setOrientation(RadioGroup.VERTICAL);
         RadioButton transfer = new RadioButton(this);
         transfer.setId(View.generateViewId());
         configurePaymentOption(transfer, R.drawable.transfermovil_payment, "Transfermóvil", "Paga desde la app y guarda el comprobante");
-        RadioGroup.LayoutParams transferLayout = new RadioGroup.LayoutParams(-1, -2);
-        transferLayout.setMargins(0, dp(5), 0, dp(5));
-        paymentChoice.addView(transfer, transferLayout);
+        paymentChoice.addView(transfer, new RadioGroup.LayoutParams(-1, dp(68)));
         RadioButton mobileBalance = new RadioButton(this);
         mobileBalance.setId(View.generateViewId());
-        configurePaymentOption(mobileBalance, R.drawable.saldo_movil_payment, "Saldo móvil", "Envía el comprobante por Telegram");
-        RadioGroup.LayoutParams balanceLayout = new RadioGroup.LayoutParams(-1, -2);
-        balanceLayout.setMargins(0, dp(5), 0, dp(5));
+        configurePaymentOption(mobileBalance, R.drawable.saldo_movil_icon, "Saldo móvil", "Envía el comprobante por Telegram");
+        RadioGroup.LayoutParams balanceLayout = new RadioGroup.LayoutParams(-1, dp(68));
+        balanceLayout.topMargin = dp(8);
         paymentChoice.addView(mobileBalance, balanceLayout);
         form.addView(paymentChoice, margin(0, 0, 0, 4));
         TextView paymentError = bodyText("Selecciona cómo vas a pagar.");
-        paymentError.setTextColor(Color.rgb(242, 198, 106));
+        paymentError.setTextColor(Color.rgb(255, 122, 137));
         paymentError.setVisibility(View.GONE);
         form.addView(paymentError);
         paymentChoice.setOnCheckedChangeListener((group, checkedId) -> paymentError.setVisibility(View.GONE));
         TextView prepared = bodyText("TEXTO PREPARADO\nHola @Niku_Blade, quiero activar Premium.\n\nEl comprobante se adjunta dentro del chat, no en la app.");
         prepared.setTextSize(12);
-        prepared.setPadding(dp(12), dp(10), dp(12), dp(10));
-        prepared.setBackground(roundRect(Color.rgb(27, 26, 31), 15, Color.rgb(70, 64, 76)));
+        prepared.setPadding(dp(14), dp(11), dp(14), dp(11));
+        prepared.setBackground(roundRect(Color.argb(18, 255, 255, 255), 16, Color.argb(35, 255, 255, 255)));
         form.addView(prepared, margin(0, 10, 0, 10));
         Button shareReceipt = goldButton("Adjuntar captura + texto");
-        form.addView(shareReceipt, margin(0, 0, 0, 8));
-        Button directChat = secondaryButton("Abrir chat directo");
-        form.addView(directChat);
-
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Solicitar plan Premium")
-                .setView(form)
-                .setNegativeButton("Cerrar", null)
-                .create();
+        form.addView(shareReceipt, new LinearLayout.LayoutParams(-1, dp(54)));
+        Button directChat = primaryButton("Abrir chat directo");
+        form.addView(directChat, margin(0, 8, 0, 0));
+        Button close = secondaryButton("Cerrar");
+        form.addView(close, margin(0, 8, 0, 0));
+        Dialog dialog = new Dialog(this);
+        dialog.setContentView(form);
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(true);
         shareReceipt.setOnClickListener(v -> {
             String message = premiumRequestMessage(selectedPlan, nameInput, usernameInput, paymentChoice, transfer, paymentError);
             if (message == null) return;
@@ -1976,26 +1994,47 @@ public final class MainActivity extends Activity {
             dialog.dismiss();
             showPremiumAdminChooser(message);
         });
+        close.setOnClickListener(v -> dialog.dismiss());
         dialog.show();
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams params = window.getAttributes();
+            params.width = Math.min(dp(430), getResources().getDisplayMetrics().widthPixels - dp(24));
+            params.height = WindowManager.LayoutParams.WRAP_CONTENT;
+            params.gravity = Gravity.BOTTOM;
+            params.dimAmount = 0.78f;
+            window.setAttributes(params);
+        }
     }
 
     private void showPremiumAdminChooser(String message) {
         Dialog chooser = new Dialog(this);
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(20), dp(18), dp(20), dp(18));
-        content.setBackground(roundRect(surfaceColor(), 22, borderColor()));
-        TextView heading = text("Elige un administrador", 18, true);
-        heading.setTextColor(accentColor());
+        content.setPadding(dp(20), dp(20), dp(20), dp(18));
+        content.setBackground(roundRect(Color.rgb(10, 11, 16), 26, Color.argb(48, 255, 255, 255)));
+        TextView heading = text("Elige un administrador", 21, true);
+        heading.setGravity(Gravity.CENTER);
         content.addView(heading);
         TextView hint = bodyText("Se abrirá Telegram con tu solicitud preparada.");
         hint.setTextSize(13);
+        hint.setGravity(Gravity.CENTER);
         content.addView(hint, margin(0, 4, 0, 13));
 
-        Button niku = secondaryButton("Administrador · @Niku_Blade");
-        Button felix = secondaryButton("Administrador · @fefefelix");
-        content.addView(niku, new LinearLayout.LayoutParams(-1, dp(48)));
-        content.addView(felix, margin(0, 8, 0, 0));
+        Button niku = secondaryButton("@Niku_Blade");
+        niku.setTextSize(16);
+        niku.setTextColor(Color.WHITE);
+        niku.setBackground(roundRect(Color.rgb(38, 28, 34), 17, Color.rgb(255, 59, 87)));
+        setButtonIcon(niku, R.drawable.ic_send, Color.rgb(255, 122, 137));
+        Button felix = secondaryButton("@fefefelix");
+        felix.setTextSize(16);
+        felix.setTextColor(Color.WHITE);
+        felix.setBackground(roundRect(Color.rgb(38, 28, 34), 17, Color.rgb(255, 59, 87)));
+        setButtonIcon(felix, R.drawable.ic_send, Color.rgb(255, 122, 137));
+        content.addView(niku, new LinearLayout.LayoutParams(-1, dp(54)));
+        content.addView(felix, margin(0, 9, 0, 0));
         Button cancel = secondaryButton("Cancelar");
         content.addView(cancel, margin(0, 8, 0, 0));
 
@@ -2015,8 +2054,13 @@ public final class MainActivity extends Activity {
         Window window = chooser.getWindow();
         if (window != null) {
             window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            int availableWidth = getResources().getDisplayMetrics().widthPixels - dp(40);
-            window.setLayout(Math.min(dp(440), availableWidth), WindowManager.LayoutParams.WRAP_CONTENT);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams params = window.getAttributes();
+            params.width = Math.min(dp(360), getResources().getDisplayMetrics().widthPixels - dp(24));
+            params.height = WindowManager.LayoutParams.WRAP_CONTENT;
+            params.gravity = Gravity.CENTER;
+            params.dimAmount = 0.78f;
+            window.setAttributes(params);
         }
     }
 
@@ -2032,12 +2076,12 @@ public final class MainActivity extends Activity {
         option.setGravity(Gravity.CENTER_VERTICAL);
         option.setMinHeight(dp(72));
         option.setPadding(dp(12), dp(9), dp(10), dp(9));
-        option.setBackground(roundRect(Color.rgb(15, 31, 49), 16, Color.rgb(50, 71, 88)));
+        option.setBackground(roundRect(Color.rgb(29, 31, 40), 16, Color.rgb(78, 82, 98)));
         option.setButtonTintList(ColorStateList.valueOf(Color.rgb(242, 198, 106)));
         option.setCompoundDrawablePadding(dp(12));
         Drawable icon = getDrawable(iconResource);
         if (icon != null) {
-            icon.setBounds(0, 0, dp(44), dp(44));
+            icon.setBounds(0, 0, dp(40), dp(40));
             option.setCompoundDrawablesRelative(icon, null, null, null);
         }
         animateButton(option);
@@ -2498,7 +2542,6 @@ public final class MainActivity extends Activity {
         if (dashboardBalanceFab != null) appRoot.removeView(dashboardBalanceFab);
         dashboardFab = null;
 
-        if (!premiumActive) {
         FrameLayout balance = new FrameLayout(this);
         GradientDrawable balanceCircle = new GradientDrawable();
         balanceCircle.setShape(GradientDrawable.OVAL);
@@ -2516,10 +2559,9 @@ public final class MainActivity extends Activity {
         balance.addView(balanceIcon, new FrameLayout.LayoutParams(dp(29), dp(29), Gravity.CENTER));
         balance.setOnClickListener(v -> requestToDusBalance());
         FrameLayout.LayoutParams balanceLayout = new FrameLayout.LayoutParams(dp(54), dp(54), Gravity.BOTTOM | Gravity.END);
-        balanceLayout.setMargins(0, 0, dp(20), dp(98));
+        balanceLayout.setMargins(0, 0, dp(20), dp(84));
         appRoot.addView(balance, balanceLayout);
         dashboardBalanceFab = balance;
-        }
 
         FrameLayout ai = new FrameLayout(this);
         GradientDrawable aiCircle = new GradientDrawable();
@@ -2535,10 +2577,10 @@ public final class MainActivity extends Activity {
         TextView aiLabel = text("IA", 15, true);
         aiLabel.setTextColor(Color.WHITE);
         aiLabel.setGravity(Gravity.CENTER);
-        ai.addView(aiLabel, new FrameLayout.LayoutParams(dp(72), dp(72), Gravity.CENTER));
+        ai.addView(aiLabel, new FrameLayout.LayoutParams(dp(56), dp(56), Gravity.CENTER));
         ai.setContentDescription("Abrir AiTod4S3");
         ai.setOnClickListener(v -> showAiChat(true));
-        FrameLayout.LayoutParams aiLayout = new FrameLayout.LayoutParams(dp(72), dp(72), Gravity.BOTTOM | Gravity.END);
+        FrameLayout.LayoutParams aiLayout = new FrameLayout.LayoutParams(dp(56), dp(56), Gravity.BOTTOM | Gravity.END);
         aiLayout.setMargins(0, 0, dp(20), dp(20));
         appRoot.addView(ai, aiLayout);
         dashboardFab = ai;
@@ -5729,7 +5771,7 @@ public final class MainActivity extends Activity {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(16), dp(16), dp(16), dp(16));
-        box.setBackground(roundRect(surfaceColor(), 25, borderColor()));
+        box.setBackground(roundRect(Color.rgb(18, 19, 26), 25, Color.rgb(58, 62, 78)));
         box.setElevation(dp(3));
         return box;
     }
@@ -5797,7 +5839,8 @@ public final class MainActivity extends Activity {
         button.setTextColor(Color.rgb(233, 235, 243));
         button.setMinHeight(dp(48));
         button.setPadding(dp(16), dp(9), dp(16), dp(9));
-        button.setBackground(roundRect(Color.argb(13, 255, 255, 255), 18, Color.argb(48, 255, 255, 255)));
+        button.setGravity(Gravity.CENTER);
+        button.setBackground(roundRect(Color.rgb(29, 31, 40), 18, Color.rgb(78, 82, 98)));
         button.setElevation(dp(2));
         animateButton(button);
         return button;

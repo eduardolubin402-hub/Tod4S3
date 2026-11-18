@@ -3,6 +3,5 @@
   "version_name": "1.5.57",
   "manifest_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/web/android-update.json",
   "apk_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/Tod4S3-Sync-v1.5.57.apk",
-  "sha256": "7126e89df0a333be5da2f20707808d6c1531f2fceff7d9edc9587ae22fff60c2",
-  "release_notes": "Menú lateral separado de la pantalla con fondo oscurecido, flechas de navegación y barra Nube ToDus a ancho completo."
+  "sha256": "7126e89df0a333be5da2f20707808d6c1531f2fceff7d9edc9587ae22fff60c2"
 }

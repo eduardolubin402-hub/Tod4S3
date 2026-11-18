@@ -52,6 +52,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ImageView;
+import android.widget.ImageButton;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
@@ -256,6 +257,7 @@ public final class MainActivity extends Activity {
     private LinearLayout aiConversationBox;
     private EditText aiComposer;
     private Button aiSendButton;
+    private View aiMicButton;
     private Switch aiVoiceToggle;
     private TextView aiChatStatus;
     private LinearLayout aiActivityPanel;
@@ -4279,221 +4281,126 @@ public final class MainActivity extends Activity {
         showingAiChat = true;
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
-        page.setPadding(dp(12), dp(8), dp(12), dp(12));
-        page.setBackgroundColor(Color.rgb(8, 10, 9));
+        page.setPadding(dp(20), dp(10), dp(20), dp(14));
+        page.setBackground(themedBackground());
 
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(0, dp(2), 0, dp(6));
-        Button back = secondaryButton("Volver");
+        Button back = secondaryButton("");
         setButtonIcon(back, R.drawable.ic_arrow_back, Color.WHITE);
-        back.setTextSize(12);
-        back.setMinHeight(dp(38));
-        back.setOnClickListener(v -> {
-            showingAiChat = false;
-            homeTabPageVisible = false;
-            showDashboard(dashboardFilter, true);
-        });
-        header.addView(back, new LinearLayout.LayoutParams(dp(82), dp(40)));
-        FrameLayout brandOrb = new FrameLayout(this);
-        GradientDrawable brandOrbBackground = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{Color.rgb(209, 221, 204), Color.rgb(151, 177, 157)});
-        brandOrbBackground.setShape(GradientDrawable.OVAL);
-        brandOrb.setBackground(brandOrbBackground);
-        brandOrb.setElevation(dp(5));
-        ImageView brandGlyph = new ImageView(this);
-        brandGlyph.setImageResource(R.drawable.ic_ai_sparkle);
-        brandGlyph.setColorFilter(Color.rgb(8, 10, 9));
-        brandOrb.addView(brandGlyph, new FrameLayout.LayoutParams(dp(21), dp(21), Gravity.CENTER));
-        LinearLayout.LayoutParams brandOrbLayout = new LinearLayout.LayoutParams(dp(38), dp(38));
-        brandOrbLayout.setMargins(dp(9), 0, dp(8), 0);
-        header.addView(brandOrb, brandOrbLayout);
-        LinearLayout brandText = new LinearLayout(this);
-        brandText.setOrientation(LinearLayout.VERTICAL);
-        brandText.addView(text("Chat", 16, true));
-        TextView brandSubtitle = text("TODUS AI", 8, true);
-        brandSubtitle.setTextColor(Color.rgb(151, 157, 152));
-        brandSubtitle.setLetterSpacing(0.1f);
-        brandText.addView(brandSubtitle, margin(0, 1, 0, 0));
-        header.addView(brandText, new LinearLayout.LayoutParams(0, -2, 1f));
-        TextView premiumBadge = text("PREMIUM", 10, true);
-        premiumBadge.setGravity(Gravity.CENTER);
-        premiumBadge.setTextColor(Color.rgb(255, 221, 141));
-        premiumBadge.setPadding(dp(7), dp(4), dp(7), dp(4));
-        premiumBadge.setBackground(roundRect(Color.rgb(60, 48, 28), 18, Color.rgb(143, 111, 48)));
-        premiumBadge.setVisibility(View.GONE);
-        header.addView(premiumBadge, new LinearLayout.LayoutParams(0, 0));
-        Button chatOptions = secondaryButton("⋮");
-        chatOptions.setTextSize(18);
-        chatOptions.setPadding(0, 0, 0, 0);
-        chatOptions.setContentDescription("Opciones del chat");
-        LinearLayout.LayoutParams optionsParams = new LinearLayout.LayoutParams(dp(34), dp(34));
-        optionsParams.setMargins(dp(5), 0, 0, 0);
-        header.addView(chatOptions, optionsParams);
-        chatOptions.setOnClickListener(this::showAiChatOptions);
-        page.addView(header);
+        back.setContentDescription("Volver");
+        back.setPadding(0, 0, 0, 0);
+        back.setOnClickListener(v -> { showingAiChat = false; homeTabPageVisible = false; showDashboard(dashboardFilter, true); });
+        header.addView(back, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        FrameLayout brandOrb = createAiOrb(dp(34), false);
+        LinearLayout.LayoutParams orbParams = new LinearLayout.LayoutParams(dp(34), dp(34));
+        orbParams.setMargins(dp(12), 0, dp(9), 0);
+        header.addView(brandOrb, orbParams);
+        LinearLayout identity = new LinearLayout(this);
+        identity.setOrientation(LinearLayout.VERTICAL);
+        identity.addView(text("AiTod4S3", 19, true));
+        aiChatStatus = text("en línea", 12, true);
+        aiChatStatus.setTextColor(Color.rgb(53, 224, 140));
+        identity.addView(aiChatStatus, margin(0, 1, 0, 0));
+        header.addView(identity, new LinearLayout.LayoutParams(0, -2, 1f));
+        Button newChat = secondaryButton("");
+        setButtonIcon(newChat, R.drawable.ic_edit, Color.WHITE);
+        newChat.setContentDescription("Nuevo chat");
+        newChat.setPadding(0, 0, 0, 0);
+        newChat.setOnClickListener(v -> { aiChatMessages.clear(); renderAiConversation(); });
+        header.addView(newChat, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        page.addView(header, margin(0, 0, 0, 7));
 
-        aiChatStatus = text("LISTA PARA AYUDAR", 9, true);
-        aiChatStatus.setTextColor(Color.rgb(209, 221, 204));
-        aiChatStatus.setSingleLine(true);
-        aiChatStatus.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        aiChatStatus.setPadding(dp(10), dp(6), dp(10), dp(6));
-        aiChatStatus.setBackground(roundRect(Color.rgb(19, 22, 21), 16, Color.rgb(57, 62, 58)));
-        page.addView(aiChatStatus, margin(2, 2, 2, 7));
-
-        LinearLayout aiTopics = new LinearLayout(this);
-        aiTopics.setOrientation(LinearLayout.HORIZONTAL);
-        String[] topicLabels = {"Actualización", "Instalación", "Descargas", "Registro", "Errores comunes"};
-        for (String topic : topicLabels) {
-            TextView chip = text(topic, 10, true);
-            chip.setGravity(Gravity.CENTER);
-            chip.setSingleLine(true);
-            chip.setPadding(dp(8), dp(5), dp(8), dp(5));
-            chip.setTextColor(Color.rgb(227, 188, 202));
-            chip.setBackground(roundRect(Color.rgb(42, 24, 34), 15, Color.rgb(112, 54, 77)));
-            chip.setOnClickListener(v -> {
-                if (aiComposer != null) {
-                    aiComposer.setText("Ayúdame con " + ((TextView) v).getText().toString().toLowerCase(java.util.Locale.ROOT));
-                    aiComposer.setSelection(aiComposer.length());
-                }
-            });
-            LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(0, dp(34), 1f);
-            chipParams.setMargins(dp(2), 0, dp(2), 0);
-            aiTopics.addView(chip, chipParams);
-        }
-        HorizontalScrollView topicsScroll = new HorizontalScrollView(this);
-        topicsScroll.setHorizontalScrollBarEnabled(false);
-        topicsScroll.addView(aiTopics, new HorizontalScrollView.LayoutParams(-2, -2));
-        page.addView(topicsScroll, margin(0, 0, 0, 7));
-
-        aiActivityPanel = new LinearLayout(this);
-        aiActivityPanel.setOrientation(LinearLayout.HORIZONTAL);
-        aiActivityPanel.setGravity(Gravity.CENTER_VERTICAL);
-        aiActivityPanel.setPadding(dp(11), dp(7), dp(12), dp(7));
-        aiActivityPanel.setBackground(roundRect(isDarkTheme() ? Color.rgb(25, 31, 51) : Color.rgb(244, 246, 255),
-                16, isDarkTheme() ? Color.rgb(73, 72, 117) : Color.rgb(219, 221, 247)));
-        aiActivityPanel.setVisibility(View.GONE);
-        FrameLayout activityOrb = new FrameLayout(this);
-        GradientDrawable activityOrbBackground = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{Color.rgb(142, 72, 228), Color.rgb(39, 176, 205)});
-        activityOrbBackground.setShape(GradientDrawable.OVAL);
-        activityOrb.setBackground(activityOrbBackground);
-        ImageView activityGlyph = new ImageView(this);
-        activityGlyph.setImageResource(R.drawable.ic_ai_sparkle);
-        activityGlyph.setColorFilter(Color.WHITE);
-        activityOrb.addView(activityGlyph, new FrameLayout.LayoutParams(dp(15), dp(15), Gravity.CENTER));
-        aiActivityPanel.addView(activityOrb, new LinearLayout.LayoutParams(dp(26), dp(26)));
-        aiActivityLabel = text("AiTod4S3 está escribiendo", 11, true);
-        aiActivityLabel.setTextColor(isDarkTheme() ? Color.rgb(223, 221, 255) : Color.rgb(74, 70, 142));
-        LinearLayout.LayoutParams activityLabelParams = new LinearLayout.LayoutParams(0, -2, 1f);
-        activityLabelParams.setMargins(dp(9), 0, dp(8), 0);
-        aiActivityPanel.addView(aiActivityLabel, activityLabelParams);
-        aiVoiceVisualizer = new LinearLayout(this);
-        aiVoiceVisualizer.setGravity(Gravity.CENTER);
-        aiVoiceVisualizer.setOrientation(LinearLayout.HORIZONTAL);
-        aiVoiceVisualizer.setVisibility(View.GONE);
-        int[] barHeights = {dp(9), dp(16), dp(12), dp(19), dp(10)};
-        for (int i = 0; i < barHeights.length; i++) {
-            View bar = new View(this);
-            bar.setBackground(roundRect(new int[]{Color.rgb(147, 91, 246), Color.rgb(63, 196, 220)}[i % 2], 4, 0));
-            LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(dp(3), barHeights[i]);
-            barParams.setMargins(dp(2), 0, dp(2), 0);
-            aiVoiceVisualizer.addView(bar, barParams);
-            ObjectAnimator wave = ObjectAnimator.ofFloat(bar, View.SCALE_Y, 0.35f, 1.2f, 0.5f);
-            wave.setDuration(420L + (i % 3) * 90L);
-            wave.setStartDelay(i * 65L);
-            wave.setRepeatCount(ObjectAnimator.INFINITE);
-            wave.setRepeatMode(ObjectAnimator.REVERSE);
-            wave.setInterpolator(new DecelerateInterpolator());
-            aiVoiceAnimators.add(wave);
-        }
-        aiActivityPanel.addView(aiVoiceVisualizer, new LinearLayout.LayoutParams(-2, dp(23)));
-        page.addView(aiActivityPanel, margin(2, 0, 2, 7));
+        View progressTrack = new View(this);
+        progressTrack.setBackground(roundRect(Color.argb(20, 255, 255, 255), 3, 0));
+        page.addView(progressTrack, new LinearLayout.LayoutParams(-1, dp(3)));
 
         aiConversationScroll = new ScrollView(this);
         aiConversationScroll.setFillViewport(true);
-        aiConversationScroll.setVerticalScrollBarEnabled(true);
-        aiConversationScroll.setBackground(roundRect(Color.rgb(8, 10, 9), 22, Color.rgb(57, 62, 58)));
+        aiConversationScroll.setVerticalScrollBarEnabled(false);
+        aiConversationScroll.setBackgroundColor(Color.TRANSPARENT);
         aiConversationBox = new LinearLayout(this);
         aiConversationBox.setOrientation(LinearLayout.VERTICAL);
-        aiConversationBox.setGravity(Gravity.CENTER);
-        aiConversationBox.setPadding(dp(11), dp(12), dp(11), dp(12));
+        aiConversationBox.setPadding(0, dp(16), 0, dp(16));
         aiConversationScroll.addView(aiConversationBox, new ScrollView.LayoutParams(-1, -2));
-        LinearLayout chatPanel = card();
-        chatPanel.setPadding(dp(6), dp(6), dp(6), dp(6));
-        chatPanel.setBackground(roundRect(Color.rgb(19, 22, 21), 25, Color.rgb(57, 62, 58)));
-        chatPanel.setElevation(dp(7));
-        chatPanel.setMinimumHeight(dp(190));
-        chatPanel.addView(aiConversationScroll, new LinearLayout.LayoutParams(-1, -1));
-        LinearLayout.LayoutParams chatPanelParams = new LinearLayout.LayoutParams(-1, 0, 1f);
-        chatPanelParams.setMargins(0, 0, 0, dp(8));
-        page.addView(chatPanel, chatPanelParams);
+        page.addView(aiConversationScroll, new LinearLayout.LayoutParams(-1, 0, 1f));
+
+        aiActivityPanel = new LinearLayout(this);
+        aiActivityPanel.setVisibility(View.GONE);
+        aiActivityLabel = text("AiTod4S3 está pensando…", 12, true);
+        aiActivityPanel.addView(aiActivityLabel);
+        aiVoiceVisualizer = new LinearLayout(this);
+        aiVoiceVisualizer.setVisibility(View.GONE);
+        aiActivityPanel.addView(aiVoiceVisualizer);
+        page.addView(aiActivityPanel, new LinearLayout.LayoutParams(0, 0));
 
         aiVoiceToggle = new Switch(this);
-        aiVoiceToggle.setText("La IA responde hablando");
-        aiVoiceToggle.setTextSize(12);
-        aiVoiceToggle.setTextColor(Color.rgb(151, 157, 152));
-        aiVoiceToggle.setPadding(dp(6), 0, dp(6), 0);
-        aiVoiceToggle.setContentDescription("Activar o desactivar respuestas habladas de AiTod4S3");
+        aiVoiceToggle.setVisibility(View.GONE);
         aiVoiceToggle.setChecked(prefs.getBoolean(PREF_AI_VOICE_MODE, false));
         aiVoiceToggle.setOnCheckedChangeListener((button, enabled) -> setAiVoiceMode(enabled));
-        page.addView(aiVoiceToggle, margin(2, 0, 2, 5));
         if (aiVoiceToggle.isChecked()) ensureAiTextToSpeech();
 
-        LinearLayout composerRow = new LinearLayout(this);
-        composerRow.setGravity(Gravity.CENTER_VERTICAL);
-        composerRow.setOrientation(LinearLayout.HORIZONTAL);
-        composerRow.setPadding(dp(6), dp(5), dp(6), dp(5));
-        composerRow.setBackground(roundRect(Color.rgb(19, 22, 21), 28, Color.rgb(57, 62, 58)));
-        composerRow.setElevation(dp(6));
+        FrameLayout composerShell = new FrameLayout(this);
+        composerShell.setPadding(dp(7), dp(6), dp(7), dp(6));
+        composerShell.setBackground(roundRect(Color.rgb(11, 12, 18), 30, Color.rgb(255, 59, 87)));
+        LinearLayout composer = new LinearLayout(this);
+        composer.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView spark = new ImageView(this);
+        spark.setImageResource(R.drawable.ic_ai_sparkle);
+        spark.setColorFilter(Color.rgb(255, 59, 87));
+        composer.addView(spark, new LinearLayout.LayoutParams(dp(22), dp(22)));
         aiComposer = new EditText(this);
-        aiComposer.setHint("Escribe tu pregunta…");
-        aiComposer.setSingleLine(false);
-        aiComposer.setMinLines(1);
-        aiComposer.setMaxLines(3);
-        aiComposer.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
-        aiComposer.setInputType(android.text.InputType.TYPE_CLASS_TEXT
-                | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
-                | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        aiComposer.setHint("Pregúntale a AiTod4S3…");
+        aiComposer.setSingleLine(true);
+        aiComposer.setGravity(Gravity.CENTER_VERTICAL);
+        aiComposer.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         aiComposer.setImeOptions(EditorInfo.IME_ACTION_SEND);
         aiComposer.setFilters(new InputFilter[]{new InputFilter.LengthFilter(2500)});
-        aiComposer.setTextColor(Color.rgb(239, 240, 236));
-        aiComposer.setHintTextColor(Color.rgb(151, 157, 152));
+        aiComposer.setTextColor(Color.rgb(244, 245, 249));
+        aiComposer.setHintTextColor(Color.rgb(109, 115, 132));
         aiComposer.setTextSize(15);
-        aiComposer.setPadding(dp(12), dp(7), dp(12), dp(7));
-        aiComposer.setBackground(roundRect(Color.TRANSPARENT, 22, 0));
-        composerRow.addView(aiComposer, new LinearLayout.LayoutParams(0, dp(46), 1f));
+        aiComposer.setPadding(dp(7), 0, dp(5), 0);
+        aiComposer.setBackgroundColor(Color.TRANSPARENT);
+        composer.addView(aiComposer, new LinearLayout.LayoutParams(0, dp(44), 1f));
+        aiMicButton = new ImageButton(this);
+        ((ImageButton) aiMicButton).setImageResource(R.drawable.ic_mic);
+        ((ImageButton) aiMicButton).setColorFilter(Color.WHITE);
+        ((ImageButton) aiMicButton).setBackground(roundRect(Color.argb(18, 255, 255, 255), 22, Color.argb(52, 255, 255, 255)));
+        aiMicButton.setContentDescription("Dictar pregunta");
+        composer.addView(aiMicButton, new LinearLayout.LayoutParams(dp(42), dp(42)));
         aiSendButton = primaryButton("");
         setButtonIcon(aiSendButton, R.drawable.ic_send, Color.WHITE);
-        aiSendButton.setTextSize(18);
         aiSendButton.setPadding(0, 0, 0, 0);
         aiSendButton.setMinHeight(0);
         aiSendButton.setMinWidth(0);
-        GradientDrawable sendCircle = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{Color.rgb(209, 221, 204), Color.rgb(151, 177, 157)});
-        sendCircle.setShape(GradientDrawable.OVAL);
-        aiSendButton.setBackground(sendCircle);
-        aiSendButton.setElevation(dp(4));
-        aiSendButton.setContentDescription("Enviar pregunta");
-        LinearLayout.LayoutParams sendParams = new LinearLayout.LayoutParams(dp(46), dp(46));
-        sendParams.setMargins(dp(7), 0, 0, 0);
-        composerRow.addView(aiSendButton, sendParams);
-        page.addView(composerRow, margin(0, 0, 0, 12));
-
-        aiSendButton.setOnClickListener(v -> sendAiMessage());
-        aiComposer.setOnEditorActionListener((view, actionId, event) -> {
-            if (actionId == EditorInfo.IME_ACTION_SEND) {
-                sendAiMessage();
-                return true;
-            }
-            return false;
-        });
+        aiSendButton.setBackground(gradientRect(new int[]{Color.rgb(255, 59, 87), Color.rgb(193, 18, 46)}, 24, 0));
+        composer.addView(aiSendButton, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        composerShell.addView(composer, new FrameLayout.LayoutParams(-1, -1));
+        page.addView(composerShell, margin(0, 0, 0, 8));
+        aiSendButton.setOnClickListener(v -> { if (!aiChatRequestInFlight) sendAiMessage(); });
+        aiMicButton.setOnClickListener(v -> { if (aiComposer != null) aiComposer.requestFocus(); ((android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE)).showSoftInput(aiComposer, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT); });
+        aiComposer.setOnEditorActionListener((view, actionId, event) -> { if (actionId == EditorInfo.IME_ACTION_SEND) { sendAiMessage(); return true; } return false; });
         loadAiChatHistory();
         renderAiConversation();
         showPage(page, animated);
-        animatePop(brandOrb);
         showingAiChat = true;
         homeTabPageVisible = true;
+    }
+
+    private FrameLayout createAiOrb(int size, boolean large) {
+        FrameLayout orb = new FrameLayout(this);
+        GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{Color.rgb(255, 59, 87), Color.rgb(229, 154, 20)});
+        bg.setShape(GradientDrawable.OVAL);
+        bg.setStroke(dp(1), Color.argb(70, 255, 255, 255));
+        orb.setBackground(bg);
+        orb.setElevation(dp(large ? 10 : 4));
+        ImageView glyph = new ImageView(this);
+        glyph.setImageResource(R.drawable.ic_ai_sparkle);
+        glyph.setColorFilter(Color.argb(220, 255, 255, 255));
+        int glyphSize = large ? size / 3 : Math.max(dp(15), size / 2);
+        orb.addView(glyph, new FrameLayout.LayoutParams(glyphSize, glyphSize, Gravity.CENTER));
+        return orb;
     }
 
     private void setAiActivityState(String label, boolean speaking, boolean visible) {
@@ -4506,6 +4413,15 @@ public final class MainActivity extends Activity {
         aiActivityPanel.setContentDescription(label);
         aiActivityPanel.setVisibility(visible ? View.VISIBLE : View.GONE);
         aiVoiceVisualizer.setVisibility(visible && speaking ? View.VISIBLE : View.GONE);
+        if (aiChatStatus != null) {
+            aiChatStatus.setText(visible ? (speaking ? "escribiendo…" : "trabajando…") : "en línea");
+            aiChatStatus.setTextColor(visible ? Color.rgb(56, 225, 255) : Color.rgb(53, 224, 140));
+        }
+        if (aiMicButton != null) aiMicButton.setVisibility(visible ? View.GONE : View.VISIBLE);
+        if (aiSendButton != null) {
+            setButtonIcon(aiSendButton, visible ? R.drawable.ic_pause : R.drawable.ic_send, Color.WHITE);
+            aiSendButton.setContentDescription(visible ? "Pausar respuesta" : "Enviar pregunta");
+        }
         if (speaking && visible) {
             for (ObjectAnimator animator : aiVoiceAnimators) {
                 if (!animator.isRunning()) animator.start();
@@ -4555,63 +4471,51 @@ public final class MainActivity extends Activity {
         aiChatThinkingBubbleLabel = null;
         if (aiChatMessages.isEmpty()) {
             aiConversationBox.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-            LinearLayout welcome = new LinearLayout(this);
-            welcome.setOrientation(LinearLayout.VERTICAL);
-            welcome.setGravity(Gravity.CENTER_HORIZONTAL);
-            welcome.setPadding(dp(14), dp(12), dp(14), dp(12));
-            FrameLayout helpOrb = new FrameLayout(this);
-            GradientDrawable orbBackground = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                    new int[]{Color.rgb(120, 88, 245), Color.rgb(58, 194, 221), Color.rgb(107, 111, 245)});
-            orbBackground.setShape(GradientDrawable.OVAL);
-            orbBackground.setStroke(dp(2), Color.argb(170, 255, 255, 255));
-            helpOrb.setBackground(orbBackground);
-            helpOrb.setElevation(dp(16));
-            helpOrb.setContentDescription("Help Me: abrir consejos para usar AiTod4S3");
-            helpOrb.setClickable(true);
-            helpOrb.setFocusable(true);
-            ImageView orbGlyph = new ImageView(this);
-            orbGlyph.setImageResource(R.drawable.ic_ai_sparkle);
-            orbGlyph.setColorFilter(Color.WHITE);
-            helpOrb.addView(orbGlyph, new FrameLayout.LayoutParams(dp(35), dp(35), Gravity.CENTER));
-            helpOrb.setOnClickListener(v -> showAiHelp());
-            welcome.addView(helpOrb, new LinearLayout.LayoutParams(dp(82), dp(82)));
-            android.animation.ObjectAnimator floatMotion = android.animation.ObjectAnimator.ofFloat(
-                    helpOrb, View.TRANSLATION_Y, 0f, -dp(6), 0f);
-            floatMotion.setDuration(2600L);
-            floatMotion.setRepeatCount(android.animation.ValueAnimator.INFINITE);
-            floatMotion.setInterpolator(new DecelerateInterpolator());
-            helpOrb.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
-                @Override public void onViewAttachedToWindow(View view) { floatMotion.start(); }
-                @Override public void onViewDetachedFromWindow(View view) { floatMotion.cancel(); }
-            });
-
-            TextView welcomeTitle = text("Hola, soy AiTod4S3", 19, true);
-            welcomeTitle.setGravity(Gravity.CENTER);
-            welcomeTitle.setTextColor(primaryTextColor());
-            welcome.addView(welcomeTitle, margin(0, 15, 0, 0));
-            TextView helpBadge = text("HELP ME  ·  TOCA LA BURBUJA", 9, true);
-            helpBadge.setGravity(Gravity.CENTER);
-            helpBadge.setTextColor(isDarkTheme() ? Color.rgb(190, 178, 255) : Color.rgb(92, 82, 190));
-            helpBadge.setPadding(dp(11), dp(6), dp(11), dp(6));
-            helpBadge.setBackground(roundRect(isDarkTheme() ? Color.rgb(35, 31, 67) : Color.rgb(237, 234, 255),
-                    14, isDarkTheme() ? Color.rgb(74, 63, 120) : Color.rgb(218, 212, 255)));
-            helpBadge.setOnClickListener(v -> showAiHelp());
-            welcome.addView(helpBadge, margin(0, 9, 0, 0));
-            TextView welcomeSubtitle = bodyText("También puedo ayudarte con actualizaciones,\ndescargas, registro y errores de la aplicación.");
-            welcomeSubtitle.setGravity(Gravity.CENTER);
-            welcomeSubtitle.setTextSize(13);
-            welcomeSubtitle.setLineSpacing(dp(3), 1f);
-            welcomeSubtitle.setTextColor(secondaryTextColor());
-            welcome.addView(welcomeSubtitle, margin(0, 10, 0, 0));
-            TextView faqHeading = text("PREGUNTAS FRECUENTES", 9, true);
-            faqHeading.setGravity(Gravity.CENTER);
-            faqHeading.setLetterSpacing(0.1f);
-            faqHeading.setTextColor(isDarkTheme() ? Color.rgb(190, 178, 255) : Color.rgb(92, 82, 190));
-            welcome.addView(faqHeading, margin(0, 16, 0, 0));
-            addAiFaqRow(welcome, 0, 1);
-            addAiFaqRow(welcome, 2, 3);
-            addAiFaqRow(welcome, 4, 5);
-            aiConversationBox.addView(welcome, new LinearLayout.LayoutParams(-1, -2));
+            FrameLayout orb = createAiOrb(dp(140), true);
+            aiConversationBox.addView(orb, new LinearLayout.LayoutParams(dp(140), dp(140)));
+            TextView title = text("Hola, soy AiTod4S3", 27, true);
+            title.setGravity(Gravity.CENTER);
+            aiConversationBox.addView(title, margin(0, 18, 0, 3));
+            TextView subtitle = bodyText("Tu asistente para descargas, vinculación y Premium");
+            subtitle.setGravity(Gravity.CENTER);
+            subtitle.setTextSize(14);
+            aiConversationBox.addView(subtitle, margin(0, 0, 0, 22));
+            String[] labels = {"Descargas", "Registro", "Actualización", "Errores comunes"};
+            String[] hints = {"Mi descarga no avanza", "Vincular con el bot", "Instalar la última versión", "Soluciones rápidas"};
+            LinearLayout grid = new LinearLayout(this);
+            grid.setOrientation(LinearLayout.VERTICAL);
+            for (int rowIndex = 0; rowIndex < 2; rowIndex++) {
+                LinearLayout row = new LinearLayout(this);
+                for (int col = 0; col < 2; col++) {
+                    int index = rowIndex * 2 + col;
+                    LinearLayout card = new LinearLayout(this);
+                    card.setOrientation(LinearLayout.VERTICAL);
+                    card.setPadding(dp(14), dp(12), dp(12), dp(10));
+                    card.setBackground(roundRect(Color.rgb(13, 14, 20), 22,
+                            index == 0 ? Color.rgb(255, 59, 87) : Color.argb(31, 255, 255, 255)));
+                    ImageView icon = new ImageView(this);
+                    icon.setImageResource(index == 0 ? R.drawable.ic_download_arrow : index == 1 ? R.drawable.ic_sync : index == 2 ? R.drawable.ic_upload_arrow : R.drawable.ic_bug_report);
+                    icon.setColorFilter(Color.WHITE);
+                    icon.setPadding(dp(8), dp(8), dp(8), dp(8));
+                    icon.setBackground(gradientRect(new int[]{Color.rgb(255, 59, 87), Color.rgb(193, 18, 46)}, 11, 0));
+                    card.addView(icon, new LinearLayout.LayoutParams(dp(34), dp(34)));
+                    card.addView(text(labels[index], 15, true), margin(0, 7, 0, 0));
+                    TextView hint = bodyText(hints[index]);
+                    hint.setTextSize(12);
+                    card.addView(hint, margin(0, 2, 0, 0));
+                    final int questionIndex = Math.min(index, AI_FAQ_PROMPTS.length - 1);
+                    card.setOnClickListener(v -> sendAiQuickQuestion(AI_FAQ_PROMPTS[questionIndex]));
+                    LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(0, dp(98), 1f);
+                    if (col > 0) cardParams.setMargins(dp(8), 0, 0, 0);
+                    row.addView(card, cardParams);
+                }
+                grid.addView(row, rowIndex == 0 ? new LinearLayout.LayoutParams(-1, dp(98)) : margin(0, 8, 0, 0));
+            }
+            aiConversationBox.addView(grid, new LinearLayout.LayoutParams(-1, -2));
+            TextView disclaimer = bodyText("AiTod4S3 puede equivocarse. Verifica lo importante.");
+            disclaimer.setTextSize(11);
+            disclaimer.setGravity(Gravity.CENTER);
+            aiConversationBox.addView(disclaimer, margin(0, 15, 0, 0));
         } else {
             aiConversationBox.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
         }
@@ -4620,92 +4524,88 @@ public final class MainActivity extends Activity {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(userMessage ? Gravity.END : Gravity.START);
-            LinearLayout bubble = new LinearLayout(this);
-            bubble.setOrientation(LinearLayout.VERTICAL);
-            bubble.setPadding(dp(14), dp(10), dp(14), dp(11));
             if (userMessage) {
-                GradientDrawable userBubble = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                        new int[]{Color.rgb(86, 84, 220), Color.rgb(36, 148, 194)});
-                userBubble.setCornerRadius(dp(19));
-                userBubble.setStroke(dp(1), Color.rgb(108, 175, 225));
-                bubble.setBackground(userBubble);
+                TextView bubble = text(message.content, 15, true);
+                bubble.setTextColor(Color.WHITE);
+                bubble.setGravity(Gravity.CENTER);
+                bubble.setPadding(dp(16), dp(9), dp(16), dp(9));
+                bubble.setBackground(gradientRect(new int[]{Color.rgb(255, 59, 87), Color.rgb(193, 18, 46)}, 18, 0));
+                row.addView(bubble, new LinearLayout.LayoutParams(-2, dp(44)));
             } else {
-                bubble.setBackground(roundRect(isDarkTheme() ? Color.rgb(28, 35, 54) : Color.rgb(255, 255, 255),
-                        19, isDarkTheme() ? Color.rgb(54, 64, 88) : Color.rgb(222, 228, 242)));
-            }
-            bubble.setElevation(dp(3));
-            TextView author = text(userMessage ? "TÚ" : "AiTod4S3", 10, true);
-            author.setTextColor(userMessage ? Color.rgb(151, 239, 228) : Color.rgb(241, 197, 111));
-            bubble.addView(author, margin(0, 0, 0, 5));
-            TextView body = text(message.content, 14, false);
-            body.setTextColor(userMessage ? Color.WHITE : primaryTextColor());
-            body.setLineSpacing(dp(3), 1.02f);
-            bubble.addView(body);
-            if (!userMessage) {
-                TextView copy = text("⧉  Copiar", 11, true);
-                copy.setTextColor(accentColor());
-                copy.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-                copy.setPadding(0, dp(7), 0, 0);
-                copy.setContentDescription("Copiar respuesta de AiTod4S3");
+                LinearLayout answer = new LinearLayout(this);
+                answer.setOrientation(LinearLayout.VERTICAL);
+                LinearLayout authorRow = new LinearLayout(this);
+                authorRow.setGravity(Gravity.CENTER_VERTICAL);
+                authorRow.addView(createAiOrb(dp(26), false), new LinearLayout.LayoutParams(dp(26), dp(26)));
+                authorRow.addView(text("AiTod4S3", 15, true), margin(8, 0, 0, 0));
+                answer.addView(authorRow);
+                TextView body = text(message.content, 15, false);
+                body.setTextColor(Color.rgb(233, 235, 243));
+                body.setTextSize(15.5f);
+                body.setLineSpacing(dp(6), 1f);
+                answer.addView(body, margin(0, 8, 0, 0));
+                ImageButton copy = new ImageButton(this);
+                copy.setImageResource(R.drawable.ic_content_copy);
+                copy.setColorFilter(Color.rgb(138, 144, 166));
+                copy.setBackgroundColor(Color.TRANSPARENT);
+                copy.setContentDescription("Copiar respuesta");
                 copy.setOnClickListener(v -> copyAiMessage(message.content));
-                copy.setOnLongClickListener(v -> {
-                    copyAiMessage(message.content);
-                    return true;
-                });
-                bubble.addView(copy, new LinearLayout.LayoutParams(-1, dp(26)));
+                LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(dp(30), dp(30));
+                copyParams.gravity = Gravity.END;
+                answer.addView(copy, copyParams);
+                row.addView(answer, new LinearLayout.LayoutParams(-1, -2));
             }
-            LinearLayout.LayoutParams bubbleParams = new LinearLayout.LayoutParams(-2, -2);
-            bubbleParams.width = Math.min(dp(310), getResources().getDisplayMetrics().widthPixels - dp(96));
-            bubbleParams.setMargins(dp(2), 0, dp(2), dp(8));
-            row.addView(bubble, bubbleParams);
-            aiConversationBox.addView(row, new LinearLayout.LayoutParams(-1, -2));
+            aiConversationBox.addView(row, margin(0, 0, 0, 14));
         }
         if (aiChatRequestInFlight) {
             LinearLayout thinking = new LinearLayout(this);
-            thinking.setOrientation(LinearLayout.HORIZONTAL);
-            thinking.setGravity(Gravity.CENTER_VERTICAL);
-            thinking.setPadding(dp(11), dp(8), dp(14), dp(8));
-            thinking.setBackground(roundRect(isDarkTheme() ? Color.rgb(25, 31, 51) : Color.rgb(244, 246, 255),
-                    18, isDarkTheme() ? Color.rgb(74, 83, 135) : Color.rgb(214, 220, 247)));
-            FrameLayout orb = new FrameLayout(this);
-            GradientDrawable orbBg = new GradientDrawable();
-            orbBg.setShape(GradientDrawable.OVAL);
-            orbBg.setColor(isDarkTheme() ? Color.rgb(31, 43, 62) : Color.rgb(231, 242, 255));
-            orbBg.setStroke(dp(1), Color.rgb(65, 157, 232));
-            orb.setBackground(orbBg);
-            View blueDot = new View(this);
-            GradientDrawable dotBg = new GradientDrawable();
-            dotBg.setShape(GradientDrawable.OVAL);
-            dotBg.setColor(Color.rgb(70, 177, 255));
-            blueDot.setBackground(dotBg);
-            FrameLayout.LayoutParams dotParams = new FrameLayout.LayoutParams(dp(7), dp(7),
-                    Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-            dotParams.topMargin = dp(1);
-            orb.addView(blueDot, dotParams);
-            thinking.addView(orb, new LinearLayout.LayoutParams(dp(30), dp(30)));
-            TextView label = text("Pensando · 0s", 12, true);
+            thinking.setOrientation(LinearLayout.VERTICAL);
+            thinking.setPadding(dp(16), dp(14), dp(16), dp(14));
+            thinking.setBackground(roundRect(Color.rgb(15, 17, 23), 24, Color.argb(90, 56, 225, 255)));
+            LinearLayout thinkingHeader = new LinearLayout(this);
+            thinkingHeader.setGravity(Gravity.CENTER_VERTICAL);
+            thinkingHeader.addView(createAiOrb(dp(26), false), new LinearLayout.LayoutParams(dp(26), dp(26)));
+            TextView label = text("Pensando…", 15, true);
+            label.setTextColor(Color.rgb(234, 249, 255));
             aiChatThinkingBubbleLabel = label;
-            label.setTextColor(isDarkTheme() ? Color.rgb(223, 221, 255) : Color.rgb(74, 70, 142));
-            LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-2, -2);
-            labelParams.setMargins(dp(9), 0, 0, 0);
-            thinking.addView(label, labelParams);
-            ObjectAnimator spin = ObjectAnimator.ofFloat(orb, View.ROTATION, 0f, 360f);
-            spin.setDuration(850L);
-            spin.setInterpolator(new android.view.animation.LinearInterpolator());
-            spin.setRepeatCount(ObjectAnimator.INFINITE);
-            spin.start();
-            thinking.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
-                @Override public void onViewAttachedToWindow(View view) { if (!spin.isRunning()) spin.start(); }
-                @Override public void onViewDetachedFromWindow(View view) { spin.cancel(); }
-            });
+            thinkingHeader.addView(label, margin(9, 0, 0, 0));
+            TextView elapsed = text("0 s", 13, false);
+            elapsed.setTextColor(Color.rgb(138, 144, 166));
+            LinearLayout.LayoutParams elapsedParams = new LinearLayout.LayoutParams(-2, -2);
+            elapsedParams.gravity = Gravity.CENTER_VERTICAL;
+            elapsedParams.weight = 1f;
+            thinkingHeader.addView(elapsed, elapsedParams);
+            thinking.addView(thinkingHeader);
+            View line = new View(this);
+            line.setBackgroundColor(Color.argb(20, 255, 255, 255));
+            thinking.addView(line, margin(0, 12, 0, 5));
+            String[] steps = {"Entendiendo tu pregunta", "Buscando en la guía de actualización", "Preparando los pasos"};
+            for (int i = 0; i < steps.length; i++) {
+                LinearLayout step = new LinearLayout(this);
+                step.setGravity(Gravity.CENTER_VERTICAL);
+                ImageView stepIcon = new ImageView(this);
+                stepIcon.setPadding(dp(4), dp(4), dp(4), dp(4));
+                stepIcon.setImageResource(i == 0 ? R.drawable.ic_check : R.drawable.ic_ai_sparkle);
+                stepIcon.setColorFilter(i == 0 ? Color.rgb(53, 224, 140) : i == 1 ? Color.rgb(56, 225, 255) : Color.rgb(109, 115, 132));
+                step.addView(stepIcon, new LinearLayout.LayoutParams(dp(24), dp(24)));
+                TextView stepText = text(steps[i], 14, i == 1);
+                stepText.setTextColor(i == 2 ? Color.rgb(109, 115, 132) : Color.rgb(233, 235, 243));
+                step.addView(stepText, margin(8, 0, 0, 0));
+                thinking.addView(step, new LinearLayout.LayoutParams(-1, dp(38)));
+            }
+            for (int width : new int[]{340, 300, 210}) {
+                View skeleton = new View(this);
+                skeleton.setBackground(roundRect(Color.argb(18, 255, 255, 255), 7, 0));
+                thinking.addView(skeleton, new LinearLayout.LayoutParams(Math.min(dp(width), getResources().getDisplayMetrics().widthPixels - dp(88)), dp(13)));
+                ((LinearLayout.LayoutParams) skeleton.getLayoutParams()).setMargins(0, dp(5), 0, 0);
+            }
+            TextView pauseHint = text("Toca pausa para detener la respuesta", 12, true);
+            pauseHint.setTextColor(Color.rgb(170, 176, 194));
+            pauseHint.setGravity(Gravity.CENTER);
+            thinking.addView(pauseHint, margin(0, 12, 0, 0));
             aiConversationBox.addView(thinking, margin(0, 0, 0, 10));
         }
-        if (!aiChatMessages.isEmpty()) {
-            aiConversationScroll.post(() -> aiConversationScroll.scrollTo(0,
-                    Math.max(0, aiConversationBox.getHeight() - aiConversationScroll.getHeight())));
-        } else {
-            aiConversationScroll.post(() -> aiConversationScroll.scrollTo(0, 0));
-        }
+        aiConversationScroll.post(() -> aiConversationScroll.scrollTo(0, Math.max(0, aiConversationBox.getHeight() - aiConversationScroll.getHeight())));
     }
 
     private void showAiChatOptions(View anchor) {

@@ -39,6 +39,7 @@ import android.view.inputmethod.EditorInfo;
 import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.LayerDrawable;
 import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.InputFilter;
@@ -542,10 +543,11 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams handleParams = new LinearLayout.LayoutParams(dp(42), dp(5));
         handleParams.gravity = Gravity.CENTER_HORIZONTAL;
         content.addView(handle, handleParams);
-        TextView icon = text("↑", 28, true);
-        icon.setGravity(Gravity.CENTER);
-        icon.setTextColor(Color.WHITE);
-        icon.setBackground(roundRect(Color.rgb(242, 30, 58), 40, Color.rgb(255, 74, 94)));
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(R.drawable.ic_upload_arrow);
+        icon.setColorFilter(Color.WHITE);
+        icon.setPadding(dp(14), dp(14), dp(14), dp(14));
+        icon.setBackground(roundRect(Color.rgb(255, 59, 87), 40, Color.rgb(255, 122, 137)));
         LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(58), dp(58));
         iconParams.gravity = Gravity.CENTER_HORIZONTAL;
         iconParams.topMargin = dp(16);
@@ -579,15 +581,11 @@ public final class MainActivity extends Activity {
         dots.setTextColor(Color.rgb(242, 30, 58));
         rejection.addView(dots, margin(0, 2, 0, 0));
         content.addView(rejection, margin(0, 18, 0, 12));
-        TextView update = text("ACTUALIZAR AHORA", 13, true);
-        update.setGravity(Gravity.CENTER);
-        update.setTextColor(Color.WHITE);
-        update.setBackground(roundRect(Color.rgb(242, 30, 58), 18, Color.rgb(255, 74, 94)));
-        content.addView(update, new LinearLayout.LayoutParams(-1, dp(52)));
-        TextView reject = text("Rechazar actualización", 12, true);
-        reject.setGravity(Gravity.CENTER);
-        reject.setTextColor(Color.rgb(180, 188, 204));
-        reject.setBackground(roundRect(Color.TRANSPARENT, 16, Color.rgb(73, 83, 103)));
+        Button update = primaryButton("ACTUALIZAR AHORA");
+        update.setTextSize(14);
+        content.addView(update, new LinearLayout.LayoutParams(-1, dp(56)));
+        Button reject = secondaryButton("Rechazar actualización");
+        reject.setTextSize(12);
         content.addView(reject, margin(0, 8, 0, 0));
 
         Dialog dialog = new Dialog(this);
@@ -1243,7 +1241,7 @@ public final class MainActivity extends Activity {
 
     private void buildUi() {
         appRoot = new FrameLayout(this);
-        appRoot.setBackgroundColor(backgroundColor());
+        appRoot.setBackground(themedBackground());
         appScroll = new ScrollView(this);
         appScroll.setFillViewport(true);
         appScroll.setBackgroundColor(backgroundColor());
@@ -1297,9 +1295,7 @@ public final class MainActivity extends Activity {
     private void showAnimatedLaunchSplash() {
         if (appRoot == null || !uiAnimationsEnabled()) return;
         FrameLayout overlay = new FrameLayout(this);
-        GradientDrawable backdrop = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{Color.rgb(9, 10, 15), Color.rgb(28, 15, 23), Color.rgb(48, 10, 20)});
-        overlay.setBackground(backdrop);
+        overlay.setBackground(themedBackground());
         overlay.setClickable(true);
         overlay.setFocusable(true);
         overlay.setElevation(dp(30));
@@ -1309,7 +1305,7 @@ public final class MainActivity extends Activity {
         content.setGravity(Gravity.CENTER_HORIZONTAL);
         FrameLayout emblem = new FrameLayout(this);
         GradientDrawable halo = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{Color.rgb(126, 15, 34), Color.rgb(70, 12, 27), Color.rgb(27, 16, 25)});
+                new int[]{Color.rgb(255, 59, 87), Color.rgb(229, 154, 20)});
         halo.setShape(GradientDrawable.OVAL);
         halo.setStroke(dp(1), Color.rgb(242, 30, 58));
         emblem.setBackground(halo);
@@ -1317,28 +1313,36 @@ public final class MainActivity extends Activity {
         ProgressBar orbit = new ProgressBar(this, null, android.R.attr.progressBarStyle);
         orbit.setIndeterminate(true);
         orbit.setIndeterminateTintList(ColorStateList.valueOf(Color.rgb(242, 30, 58)));
-        emblem.addView(orbit, new FrameLayout.LayoutParams(dp(132), dp(132), Gravity.CENTER));
+        emblem.addView(orbit, new FrameLayout.LayoutParams(dp(158), dp(158), Gravity.CENTER));
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.drawable.tod4s3_logo);
         logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
         logo.setContentDescription("Logo de Tod4S3 Sync, descarga en curso");
-        FrameLayout.LayoutParams logoLayout = new FrameLayout.LayoutParams(dp(78), dp(78), Gravity.CENTER);
+        FrameLayout.LayoutParams logoLayout = new FrameLayout.LayoutParams(dp(92), dp(92), Gravity.CENTER);
         emblem.addView(logo, logoLayout);
-        content.addView(emblem, new LinearLayout.LayoutParams(dp(148), dp(148)));
+        content.addView(emblem, new LinearLayout.LayoutParams(dp(172), dp(172)));
 
-        TextView title = text("Tod4S3 Sync", 26, true);
+        TextView title = text("Tod4S3", 50, true);
         title.setGravity(Gravity.CENTER);
         title.setTextColor(Color.WHITE);
-        content.addView(title, margin(0, 24, 0, 5));
-        TextView subtitle = text("SINCRONIZA · DESCARGA · DISFRUTA", 9, true);
+        content.addView(title, margin(0, 24, 0, 3));
+        TextView subtitle = text("S  Y  N  C", 11, true);
         subtitle.setLetterSpacing(0.15f);
         subtitle.setGravity(Gravity.CENTER);
-        subtitle.setTextColor(Color.rgb(255, 137, 151));
-        content.addView(subtitle, margin(0, 0, 0, 22));
+        subtitle.setTextColor(Color.rgb(255, 211, 107));
+        content.addView(subtitle, margin(0, 0, 0, 26));
         ProgressBar loading = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         loading.setIndeterminate(true);
         loading.setIndeterminateTintList(ColorStateList.valueOf(Color.rgb(242, 30, 58)));
         content.addView(loading, new LinearLayout.LayoutParams(dp(168), dp(4)));
+        TextView loadingLabel = text("Iniciando…", 11, false);
+        loadingLabel.setTextColor(secondaryTextColor());
+        loadingLabel.setGravity(Gravity.CENTER);
+        content.addView(loadingLabel, margin(0, 8, 0, 0));
+        TextView version = text("v" + appVersion(), 10, false);
+        version.setTextColor(Color.rgb(92, 98, 119));
+        version.setGravity(Gravity.CENTER);
+        content.addView(version, margin(0, 18, 0, 0));
 
         overlay.addView(content, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
         appRoot.addView(overlay, new FrameLayout.LayoutParams(-1, -1));
@@ -1412,7 +1416,7 @@ public final class MainActivity extends Activity {
         if (wallpaperScrim != null && wallpaperScrim.getParent() == appRoot) appRoot.removeView(wallpaperScrim);
         wallpaperImageView = null;
         wallpaperScrim = null;
-        appRoot.setBackgroundColor(backgroundColor());
+        appRoot.setBackground(themedBackground());
         appRoot.removeView(appScroll);
         // No dibujar fondos de galería debajo de la interfaz principal. Una imagen
         // guardada anteriormente podía cubrir visualmente Descargas y el menú con
@@ -1445,7 +1449,7 @@ public final class MainActivity extends Activity {
                 wallpaperScrim = null;
             }
         }
-        appScroll.setBackgroundColor(wallpaperImageView != null ? Color.TRANSPARENT : backgroundColor());
+        appScroll.setBackgroundColor(Color.TRANSPARENT);
         appRoot.addView(appScroll, new FrameLayout.LayoutParams(-1, -1));
     }
 
@@ -1610,9 +1614,10 @@ public final class MainActivity extends Activity {
         free.setTag("tod4s3_plan_card");
         LinearLayout freeHeader = new LinearLayout(this);
         freeHeader.setGravity(Gravity.CENTER_VERTICAL);
-        TextView freeIcon = text("◔", 18, true);
-        freeIcon.setGravity(Gravity.CENTER);
-        freeIcon.setTextColor(Color.WHITE);
+        ImageView freeIcon = new ImageView(this);
+        freeIcon.setImageResource(R.drawable.ic_cloud_download);
+        freeIcon.setColorFilter(Color.WHITE);
+        freeIcon.setPadding(dp(7), dp(7), dp(7), dp(7));
         freeIcon.setBackground(roundRect(Color.rgb(55, 64, 83), 18, Color.rgb(83, 98, 126)));
         freeHeader.addView(freeIcon, new LinearLayout.LayoutParams(dp(38), dp(38)));
         LinearLayout freeTitles = new LinearLayout(this);
@@ -1773,9 +1778,10 @@ public final class MainActivity extends Activity {
         medalBg.setColor(Color.TRANSPARENT);
         medalBg.setStroke(dp(3), Color.rgb(255, 204, 76));
         medal.setBackground(medalBg);
-        TextView star = text("★", 29, true);
-        star.setGravity(Gravity.CENTER);
-        star.setTextColor(Color.rgb(255, 204, 76));
+        ImageView star = new ImageView(this);
+        star.setImageResource(R.drawable.ic_star);
+        star.setColorFilter(Color.rgb(255, 211, 107));
+        star.setPadding(dp(21), dp(21), dp(21), dp(21));
         medal.addView(star, new FrameLayout.LayoutParams(dp(76), dp(76), Gravity.CENTER));
         LinearLayout.LayoutParams medalParams = new LinearLayout.LayoutParams(dp(82), dp(82));
         medalParams.gravity = Gravity.CENTER_HORIZONTAL;
@@ -2351,8 +2357,8 @@ public final class MainActivity extends Activity {
         bar.setBackground(roundRect(isDarkTheme() ? Color.rgb(24, 16, 24) : Color.WHITE, 20, borderColor()));
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        Button menu = primaryButton("☰");
-        menu.setTextSize(21);
+        Button menu = secondaryButton("");
+        setButtonIcon(menu, R.drawable.ic_menu, Color.WHITE);
         menu.setMinHeight(dp(48));
         menu.setPadding(0, 0, 0, 0);
         menu.setOnClickListener(this::showNavigationDrawer);
@@ -2369,22 +2375,6 @@ public final class MainActivity extends Activity {
         header.addView(identity, identityLayout);
         header.addView(accountMenuButton(), new LinearLayout.LayoutParams(dp(50), dp(50)));
         bar.addView(header);
-        LinearLayout cloudRow = new LinearLayout(this);
-        cloudRow.setGravity(Gravity.CENTER_VERTICAL);
-        TextView cloudLabel = text("Nube ToDus", 12, true);
-        cloudLabel.setTextColor(primaryTextColor());
-        cloudRow.addView(cloudLabel, new LinearLayout.LayoutParams(0, -2, 1f));
-        TextView cloudValue = text("Uso de espacio y entregas", 10, false);
-        cloudValue.setTextColor(secondaryTextColor());
-        cloudRow.addView(cloudValue);
-        bar.addView(cloudRow, margin(0, 9, 0, 0));
-        View cloudProgress = new View(this);
-        cloudProgress.setBackground(roundRect(accentColor(), 8, 0));
-        // Una View sin contenido y con WRAP_CONTENT puede ocupar toda la altura
-        // disponible dentro del ScrollView. La barra debe ser siempre compacta.
-        LinearLayout.LayoutParams cloudProgressLayout = new LinearLayout.LayoutParams(-1, dp(6));
-        cloudProgressLayout.setMargins(0, dp(7), 0, 0);
-        bar.addView(cloudProgress, cloudProgressLayout);
         return bar;
     }
 
@@ -2953,7 +2943,8 @@ public final class MainActivity extends Activity {
         track.setCornerRadius(dp(20));
         GradientDrawable fill = new GradientDrawable();
         fill.setShape(GradientDrawable.RECTANGLE);
-        fill.setColor(fillColor);
+        fill.setColors(new int[]{Color.rgb(255, 59, 87), Color.rgb(255, 154, 60)});
+        fill.setOrientation(GradientDrawable.Orientation.LEFT_RIGHT);
         fill.setCornerRadius(dp(20));
         android.graphics.drawable.ClipDrawable clipped = new android.graphics.drawable.ClipDrawable(
                 fill, Gravity.LEFT, android.graphics.drawable.ClipDrawable.HORIZONTAL);
@@ -3567,11 +3558,12 @@ public final class MainActivity extends Activity {
                 logout || active ? Color.rgb(242, 30, 58) : borderColor()));
         row.setElevation(dp(1));
         row.setContentDescription(title + ". " + subtitle);
-        TextView glyph = text(icon, 16, true);
-        glyph.setGravity(Gravity.CENTER);
-        glyph.setTextColor(logout ? Color.rgb(255, 102, 123) : accentColor());
-        glyph.setBackground(roundRect(logout || active ? Color.rgb(111, 28, 45) : Color.rgb(34, 27, 38), 12,
-                logout || active ? Color.rgb(242, 30, 58) : Color.TRANSPARENT));
+        ImageView glyph = new ImageView(this);
+        glyph.setImageResource(drawerIconResource(title));
+        glyph.setColorFilter(logout ? Color.rgb(255, 122, 137) : accentColor());
+        glyph.setPadding(dp(7), dp(7), dp(7), dp(7));
+        glyph.setBackground(roundRect(logout || active ? Color.argb(92, 255, 59, 87) : Color.argb(34, 255, 59, 87), 12,
+                logout || active ? Color.rgb(255, 59, 87) : Color.TRANSPARENT));
         row.addView(glyph, new LinearLayout.LayoutParams(dp(32), dp(32)));
         TextView label = text(title, 12, true);
         label.setSingleLine(true);
@@ -3588,6 +3580,22 @@ public final class MainActivity extends Activity {
             action.run();
         });
         parent.addView(row, margin(0, 0, 0, 4));
+    }
+
+    private int drawerIconResource(String title) {
+        if (title.contains("Planes")) return R.drawable.ic_star;
+        if (title.contains("Archivos")) return R.drawable.ic_inbox_delivery;
+        if (title.contains("nube")) return R.drawable.ic_cloud_download;
+        if (title.contains("Descargas")) return R.drawable.ic_download_arrow;
+        if (title.contains("Historial")) return R.drawable.ic_refresh;
+        if (title.contains("Velocidad")) return R.drawable.ic_active_download;
+        if (title.contains("Registros")) return R.drawable.ic_file_card;
+        if (title.contains("Acerca")) return R.drawable.ic_info;
+        if (title.contains("Ajustes")) return R.drawable.ic_settings;
+        if (title.contains("Volver a vincular")) return R.drawable.ic_refresh;
+        if (title.contains("Cambiar cuenta")) return R.drawable.ic_swap;
+        if (title.contains("Cerrar sesión")) return R.drawable.ic_logout;
+        return R.drawable.ic_info;
     }
 
     private LinearLayout sectionHeader(String title) {
@@ -5280,10 +5288,11 @@ public final class MainActivity extends Activity {
         logo.setPadding(dp(11), dp(11), dp(11), dp(11));
         avatar.addView(logo, new FrameLayout.LayoutParams(dp(48), dp(48), Gravity.CENTER));
         loadTelegramProfilePhoto(logo);
-        TextView bars = text("☰", 11, true);
-        bars.setGravity(Gravity.CENTER);
-        bars.setTextColor(Color.rgb(40, 27, 6));
-        bars.setBackground(roundRect(Color.rgb(242, 198, 106), 10, Color.rgb(7, 17, 31)));
+        ImageView bars = new ImageView(this);
+        bars.setImageResource(R.drawable.ic_menu);
+        bars.setColorFilter(Color.rgb(27, 18, 0));
+        bars.setPadding(dp(3), dp(3), dp(3), dp(3));
+        bars.setBackground(roundRect(Color.rgb(255, 211, 107), 10, Color.rgb(255, 211, 107)));
         FrameLayout.LayoutParams badge = new FrameLayout.LayoutParams(dp(18), dp(18), Gravity.BOTTOM | Gravity.END);
         badge.rightMargin = dp(2);
         badge.bottomMargin = dp(2);
@@ -5597,13 +5606,6 @@ public final class MainActivity extends Activity {
     }
 
     private boolean isDarkTheme() {
-        String selected = prefs.getString(PREF_UI_THEME, "dark");
-        if ("light".equals(selected)) return false;
-        if ("system".equals(selected)) {
-            int mode = getResources().getConfiguration().uiMode
-                    & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
-            return mode == android.content.res.Configuration.UI_MODE_NIGHT_YES;
-        }
         return true;
     }
 
@@ -5621,32 +5623,31 @@ public final class MainActivity extends Activity {
     }
 
     private int backgroundColor() {
-        return isDarkTheme() ? Color.rgb(9, 10, 15) : Color.rgb(246, 247, 250);
+        return Color.rgb(7, 8, 12);
     }
 
     private int surfaceColor() {
-        return isDarkTheme() ? Color.rgb(19, 20, 27) : Color.WHITE;
+        return Color.argb(18, 255, 255, 255);
     }
 
     private int raisedSurfaceColor() {
-        return isDarkTheme() ? Color.rgb(28, 29, 37) : Color.rgb(239, 240, 244);
+        return Color.argb(24, 255, 255, 255);
     }
 
     private int borderColor() {
-        return isDarkTheme() ? Color.rgb(52, 53, 63) : Color.rgb(218, 220, 227);
+        return Color.argb(48, 255, 255, 255);
     }
 
     private int primaryTextColor() {
-        return isDarkTheme() ? Color.WHITE : Color.rgb(27, 28, 34);
+        return Color.rgb(244, 245, 249);
     }
 
     private int secondaryTextColor() {
-        return isDarkTheme() ? Color.rgb(171, 172, 181) : Color.rgb(93, 96, 106);
+        return Color.rgb(138, 144, 166);
     }
 
     private int accentColor() {
-        try { return Color.parseColor(prefs.getString(PREF_UI_ACCENT, "#F21E3A")); }
-        catch (Exception ignored) { return Color.rgb(242, 30, 58); }
+        return Color.rgb(255, 59, 87);
     }
 
     private int onAccentColor() {
@@ -5659,8 +5660,8 @@ public final class MainActivity extends Activity {
     private LinearLayout card() {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(18), dp(18), dp(18), dp(18));
-        box.setBackground(roundRect(surfaceColor(), 20, borderColor()));
+        box.setPadding(dp(16), dp(16), dp(16), dp(16));
+        box.setBackground(roundRect(surfaceColor(), 25, borderColor()));
         box.setElevation(dp(3));
         return box;
     }
@@ -5682,9 +5683,11 @@ public final class MainActivity extends Activity {
         edit.setInputType(inputType);
         edit.setTextColor(primaryTextColor());
         edit.setHintTextColor(secondaryTextColor());
-        edit.setTextSize(16);
-        edit.setPadding(dp(14), dp(11), dp(14), dp(11));
-        edit.setBackground(roundRect(raisedSurfaceColor(), 14, borderColor()));
+        edit.setTextSize(17);
+        edit.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        edit.setMinHeight(dp(64));
+        edit.setPadding(dp(16), dp(12), dp(16), dp(12));
+        edit.setBackground(roundRect(raisedSurfaceColor(), 18, borderColor()));
         return edit;
     }
 
@@ -5692,13 +5695,13 @@ public final class MainActivity extends Activity {
         Button button = new Button(this);
         button.setText(label);
         button.setAllCaps(false);
-        button.setTextSize(15);
+        button.setTextSize(17);
         button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         button.setTextColor(onAccentColor());
-        button.setMinHeight(dp(54));
-        button.setPadding(dp(16), dp(10), dp(16), dp(10));
-        button.setBackground(roundRect(accentColor(), 16, 0));
-        button.setElevation(dp(4));
+        button.setMinHeight(dp(56));
+        button.setPadding(dp(18), dp(11), dp(18), dp(11));
+        button.setBackground(gradientRect(new int[]{Color.rgb(255, 59, 87), Color.rgb(193, 18, 46)}, 18, 0));
+        button.setElevation(dp(7));
         animateButton(button);
         return button;
     }
@@ -5707,13 +5710,13 @@ public final class MainActivity extends Activity {
         Button button = new Button(this);
         button.setText(label);
         button.setAllCaps(false);
-        button.setTextSize(14);
+        button.setTextSize(17);
         button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         button.setTextColor(Color.rgb(40, 27, 6));
-        button.setMinHeight(dp(50));
-        button.setPadding(dp(16), dp(9), dp(16), dp(9));
-        button.setBackground(roundRect(Color.rgb(242, 198, 106), 16, 0));
-        button.setElevation(dp(4));
+        button.setMinHeight(dp(54));
+        button.setPadding(dp(18), dp(10), dp(18), dp(10));
+        button.setBackground(gradientRect(new int[]{Color.rgb(255, 211, 107), Color.rgb(229, 154, 20)}, 18, 0));
+        button.setElevation(dp(7));
         animateButton(button);
         return button;
     }
@@ -5722,11 +5725,11 @@ public final class MainActivity extends Activity {
         Button button = new Button(this);
         button.setText(label);
         button.setAllCaps(false);
-        button.setTextSize(13);
-        button.setTextColor(accentColor());
-        button.setMinHeight(dp(42));
-        button.setPadding(dp(12), dp(6), dp(12), dp(6));
-        button.setBackground(roundRect(raisedSurfaceColor(), 14, borderColor()));
+        button.setTextSize(15);
+        button.setTextColor(Color.rgb(233, 235, 243));
+        button.setMinHeight(dp(48));
+        button.setPadding(dp(16), dp(9), dp(16), dp(9));
+        button.setBackground(roundRect(Color.argb(13, 255, 255, 255), 18, Color.argb(48, 255, 255, 255)));
         button.setElevation(dp(2));
         animateButton(button);
         return button;
@@ -5771,6 +5774,29 @@ public final class MainActivity extends Activity {
         drawable.setCornerRadius(dp(radius));
         if (strokeColor != 0) drawable.setStroke(dp(1), strokeColor);
         return drawable;
+    }
+
+    private GradientDrawable gradientRect(int[] colors, int radius, int strokeColor) {
+        GradientDrawable drawable = new GradientDrawable(GradientDrawable.Orientation.TL_BR, colors);
+        drawable.setCornerRadius(dp(radius));
+        if (strokeColor != 0) drawable.setStroke(dp(1), strokeColor);
+        return drawable;
+    }
+
+    private Drawable themedBackground() {
+        GradientDrawable base = new GradientDrawable();
+        base.setColor(backgroundColor());
+        GradientDrawable redGlow = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{Color.argb(92, 255, 59, 87), Color.TRANSPARENT, Color.TRANSPARENT});
+        redGlow.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+        redGlow.setGradientCenter(0.72f, 0.02f);
+        redGlow.setGradientRadius(dp(360));
+        GradientDrawable goldGlow = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{Color.argb(42, 229, 154, 20), Color.TRANSPARENT});
+        goldGlow.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+        goldGlow.setGradientCenter(0.78f, 0.93f);
+        goldGlow.setGradientRadius(dp(420));
+        return new LayerDrawable(new Drawable[]{base, redGlow, goldGlow});
     }
 
     private void showPage(LinearLayout page, boolean animated) {

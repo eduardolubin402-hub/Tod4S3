@@ -9,23 +9,14 @@ SOURCE = (Path(__file__).resolve().parents[1]
 
 
 class CloudHeaderRegressionTests(unittest.TestCase):
-    def test_cloud_indicator_has_a_small_explicit_height(self):
+    def test_dashboard_toolbar_does_not_render_a_full_height_cloud_usage_panel(self):
         source = SOURCE.read_text(encoding="utf-8")
         toolbar = source.split("private LinearLayout dashboardToolbar()", 1)[1].split(
             "private LinearLayout dashboardTabs()", 1
         )[0]
-        self.assertIn('text("Nube ToDus"', toolbar)
-        self.assertIn('text("Uso de espacio y entregas"', toolbar)
-        layout = re.search(
-            r"LinearLayout\.LayoutParams\s+cloudProgressLayout\s*=\s*"
-            r"new\s+LinearLayout\.LayoutParams\s*\(\s*-1\s*,\s*dp\((\d+)\)\s*\)",
-            toolbar,
-        )
-        self.assertIsNotNone(layout, "The cloud bar must not use WRAP_CONTENT for height")
-        self.assertGreaterEqual(int(layout.group(1)), 1)
-        self.assertLessEqual(int(layout.group(1)), 12)
-        self.assertIn("bar.addView(cloudProgress, cloudProgressLayout);", toolbar)
-        self.assertNotIn("bar.addView(cloudProgress, margin(", toolbar)
+        self.assertNotIn('text("Nube ToDus"', toolbar)
+        self.assertNotIn('text("Uso de espacio y entregas"', toolbar)
+        self.assertNotIn("cloudProgress", toolbar)
 
     def test_plan_and_tabs_follow_the_toolbar(self):
         source = SOURCE.read_text(encoding="utf-8")

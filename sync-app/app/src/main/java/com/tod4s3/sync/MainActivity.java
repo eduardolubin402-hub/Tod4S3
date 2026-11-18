@@ -4421,6 +4421,7 @@ public final class MainActivity extends Activity {
         aiComposer.setOnEditorActionListener((view, actionId, event) -> { if (actionId == EditorInfo.IME_ACTION_SEND) { sendAiMessage(); return true; } return false; });
         loadAiChatHistory();
         renderAiConversation();
+        ensureAiTextToSpeech();
         showingAiChat = true;
         homeTabPageVisible = true;
         appScroll.setPadding(0, 0, 0, 0);
@@ -4789,8 +4790,11 @@ public final class MainActivity extends Activity {
             if (callMode) stopAiVoiceCall();
             return;
         }
-        if (aiSpeechRecognizer != null) aiSpeechRecognizer.destroy();
-        aiSpeechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+        if (aiSpeechRecognizer == null) {
+            aiSpeechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+        } else {
+            aiSpeechRecognizer.cancel();
+        }
         aiSpeechRecognizer.setRecognitionListener(new RecognitionListener() {
             @Override public void onReadyForSpeech(Bundle params) {
                 aiVoiceCallListening = callMode;
@@ -4820,7 +4824,7 @@ public final class MainActivity extends Activity {
                 if (callMode && aiVoiceCallActive && !aiChatRequestInFlight) {
                     handler.postDelayed(() -> {
                         if (aiVoiceCallActive && !aiChatRequestInFlight) beginAiSpeechRecognition(true);
-                    }, 350L);
+                    }, 110L);
                 } else if (aiChatStatus != null) {
                     aiChatStatus.setText("en línea");
                 }
@@ -4847,7 +4851,7 @@ public final class MainActivity extends Activity {
                 } else if (callMode && aiVoiceCallActive && !aiChatRequestInFlight) {
                     handler.postDelayed(() -> {
                         if (aiVoiceCallActive && !aiChatRequestInFlight) beginAiSpeechRecognition(true);
-                    }, 350L);
+                    }, 110L);
                 }
             }
             @Override public void onPartialResults(Bundle partialResults) {
@@ -5325,6 +5329,12 @@ public final class MainActivity extends Activity {
                     handleAiVoiceUnavailable();
                     return;
                 }
+                aiTextToSpeech.setSpeechRate(0.94f);
+                aiTextToSpeech.setPitch(1.03f);
+                aiTextToSpeech.setAudioAttributes(new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build());
                 aiTtsReady = true;
                 aiTextToSpeech.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                     @Override public void onStart(String utteranceId) {
@@ -5339,7 +5349,7 @@ public final class MainActivity extends Activity {
                                     if (aiVoiceCallActive && aiVoiceCallSpeaking && aiVoiceCallBargeInListening) {
                                         beginAiSpeechRecognition(true);
                                     }
-                                }, 180L);
+                                }, 80L);
                             }
                             setAiActivityState("AiTod4S3 está hablando…", true, true);
                         });

@@ -3,6 +3,5 @@
   "version_name": "1.5.58",
   "manifest_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/web/android-update.json",
   "apk_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/Tod4S3-Sync-v1.5.58.apk",
-  "sha256": "6675ffa414b7418c08ab93c386fa35119a582e7b1762b6058d6a6489c05c8be3",
-  "release_notes": "Corrección del espacio negro bajo Premium activo, menú lateral separado y cabecera de nube ajustada."
+  "sha256": "6675ffa414b7418c08ab93c386fa35119a582e7b1762b6058d6a6489c05c8be3"
 }

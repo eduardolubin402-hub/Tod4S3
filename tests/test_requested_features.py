@@ -72,7 +72,7 @@ class RequestedFeatureTests(unittest.TestCase):
         self.assertIn("← Volver a mis archivos", plans)
         self.assertIn("planStatus = statusText(accountPlanStatusText())", plans)
         self.assertIn('dashboardPlanStatusText = text(accountPlanShortLabel(), 16, true)', source)
-        self.assertIn('text(verifiedPremium ? "PLAN GRATUITO" : "RECOMENDADO PARA EMPEZAR"', plans)
+        self.assertIn('text(verifiedPremium ? "DISPONIBLE" : "TU PLAN"', plans)
         self.assertIn("viewingDashboard = false;", plans)
 
         free_choice = source.split("private void chooseFreePlan", 1)[1].split("private void continueWithActivePlan", 1)[0]

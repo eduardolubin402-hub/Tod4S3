@@ -1624,7 +1624,7 @@ public final class MainActivity extends Activity {
         LinearLayout.LayoutParams freeTitlesParams = new LinearLayout.LayoutParams(0, -2, 1f);
         freeTitlesParams.setMargins(dp(10), 0, 0, 0);
         freeHeader.addView(freeTitles, freeTitlesParams);
-        TextView planPill = text("TU PLAN", 9, true);
+        TextView planPill = text(verifiedPremium ? "DISPONIBLE" : "TU PLAN", 9, true);
         planPill.setTextColor(Color.rgb(90, 224, 166));
         planPill.setGravity(Gravity.CENTER);
         planPill.setPadding(dp(8), dp(4), dp(8), dp(4));
@@ -1653,7 +1653,10 @@ public final class MainActivity extends Activity {
         page.addView(text("Planes Premium", 19, true), margin(0, 2, 0, 3));
         page.addView(bodyText("Descargas ilimitadas y AiTod4S3 mientras el plan esté activo."), margin(0, 0, 0, 9));
         page.addView(bodyText("Premium también incluye cola prioritaria, reintentos automáticos, hasta 3 descargas en paralelo y herramientas multimedia desde el bot: subtítulos SRT, corte/unión de videos y conversión de imágenes por lotes."), margin(0, 0, 0, 9));
-        page.addView(premiumShowcase(), margin(0, 0, 0, 8));
+        page.addView(planOffer("Premium 15 días", "250 CUP", "Descargas sin límite · 3 en paralelo · herramientas multimedia · AiTod4S3.", "Premium 15 días · 250 CUP"), margin(0, 0, 0, 8));
+        page.addView(planOffer("Premium 20 días", "300 CUP", "Descargas sin límite · cola prioritaria · herramientas multimedia · AiTod4S3.", "Premium 20 días · 300 CUP"), margin(0, 0, 0, 8));
+        page.addView(planOffer("Premium 30 días", "500 CUP", "Descargas sin límite · reintentos automáticos · herramientas multimedia · AiTod4S3.", "Premium 30 días · 500 CUP"), margin(0, 0, 0, 8));
+        page.addView(bodyText("Vendedores: @Niku_Blade · @fefefelix"), margin(0, 2, 0, 4));
         LinearLayout paymentMethods = new LinearLayout(this);
         paymentMethods.setOrientation(LinearLayout.HORIZONTAL);
         paymentMethods.addView(paymentMethodChip(R.drawable.transfermovil_payment, "Transfermóvil"), new LinearLayout.LayoutParams(0, -2, 1f));
@@ -1667,82 +1670,11 @@ public final class MainActivity extends Activity {
         if (token != null && !token.isEmpty()) refreshAccountProfile();
     }
 
-    private LinearLayout premiumShowcase() {
-        LinearLayout offer = card();
-        offer.setTag("tod4s3_plan_card");
-        offer.setPadding(dp(15), dp(14), dp(15), dp(14));
-        GradientDrawable background = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{Color.rgb(31, 28, 27), Color.rgb(47, 29, 32)});
-        background.setCornerRadius(dp(22));
-        background.setStroke(dp(1), Color.rgb(255, 204, 76));
-        offer.setBackground(background);
-        offer.setElevation(dp(5));
-        LinearLayout badgeRow = new LinearLayout(this);
-        badgeRow.setGravity(Gravity.CENTER_VERTICAL);
-        TextView badge = text("★  RECOMENDADO", 10, true);
-        badge.setTextColor(Color.rgb(255, 218, 117));
-        badge.setPadding(dp(8), dp(4), dp(8), dp(4));
-        badge.setBackground(roundRect(Color.rgb(69, 55, 28), 15, Color.rgb(174, 137, 53)));
-        badgeRow.addView(badge);
-        TextView premiumState = text("PREMIUM", 10, true);
-        premiumState.setTextColor(Color.rgb(255, 221, 141));
-        premiumState.setGravity(Gravity.END);
-        badgeRow.addView(premiumState, new LinearLayout.LayoutParams(0, -2, 1f));
-        offer.addView(badgeRow);
-        TextView title = text("Premium", 25, true);
-        title.setTextColor(Color.WHITE);
-        offer.addView(title, margin(0, 9, 0, 2));
-        TextView subtitle = bodyText("Más datos por día y herramientas exclusivas desde el bot.");
-        subtitle.setTextColor(Color.rgb(224, 221, 214));
-        offer.addView(subtitle);
-        String[] features = {"Más datos por día", "Compresor Premium desde el bot", "Soporte directo del vendedor"};
-        for (String feature : features) {
-            TextView row = text("✓  " + feature, 12, false);
-            row.setTextColor(Color.rgb(231, 228, 220));
-            offer.addView(row, margin(0, 7, 0, 0));
-        }
-        TextView sellers = text("VENDEDORES", 9, true);
-        sellers.setTextColor(Color.rgb(166, 157, 143));
-        sellers.setLetterSpacing(0.08f);
-        offer.addView(sellers, margin(0, 13, 0, 5));
-        LinearLayout sellerRow = new LinearLayout(this);
-        sellerRow.setOrientation(LinearLayout.HORIZONTAL);
-        sellerRow.addView(planChip("@Niku_Blade"));
-        LinearLayout.LayoutParams secondChip = new LinearLayout.LayoutParams(-2, -2);
-        secondChip.setMargins(dp(7), 0, 0, 0);
-        sellerRow.addView(planChip("@fefefelix"), secondChip);
-        offer.addView(sellerRow);
-        Button buy = goldButton("Comprar premium");
-        buy.setTextSize(14);
-        buy.setMinHeight(dp(48));
-        buy.setOnClickListener(v -> openPremiumRequest("Premium 15 días · 250 CUP"));
-        offer.addView(buy, margin(0, 14, 0, 4));
-        TextView options = text("15 días · 250 CUP     20 días · 300 CUP     30 días · 500 CUP", 11, true);
-        options.setGravity(Gravity.CENTER);
-        options.setTextColor(Color.rgb(255, 218, 117));
-        options.setOnClickListener(v -> openPremiumRequest("Premium 30 días · 500 CUP"));
-        offer.addView(options, margin(0, 5, 0, 0));
-        TextView activate = text("Ya soy premium  ›", 12, true);
-        activate.setGravity(Gravity.CENTER);
-        activate.setTextColor(Color.rgb(255, 218, 117));
-        activate.setOnClickListener(v -> promptPremiumActivationToken());
-        offer.addView(activate, margin(0, 8, 0, 0));
-        return offer;
-    }
-
-    private TextView planChip(String label) {
-        TextView chip = text(label, 10, true);
-        chip.setTextColor(Color.rgb(255, 218, 117));
-        chip.setPadding(dp(8), dp(5), dp(8), dp(5));
-        chip.setBackground(roundRect(Color.rgb(61, 51, 31), 12, Color.rgb(135, 110, 56)));
-        return chip;
-    }
-
     private LinearLayout planOffer(String name, String price, String detail, String purchasePlan) {
         LinearLayout offer = card();
         offer.setTag("tod4s3_plan_card");
         offer.setPadding(dp(16), dp(15), dp(16), dp(15));
-        int tierColor = Color.rgb(255, 204, 76);
+        int tierColor = isDarkTheme() ? Color.rgb(255, 204, 76) : Color.rgb(115, 77, 0);
         int offerStart = isDarkTheme() ? Color.rgb(29, 25, 25) : Color.rgb(255, 255, 255);
         int offerEnd = isDarkTheme() ? Color.rgb(35, 28, 30) : Color.rgb(245, 247, 251);
         GradientDrawable offerBackground = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
@@ -1764,18 +1696,23 @@ public final class MainActivity extends Activity {
         detailLabel.setTextSize(12);
         offer.addView(detailLabel, margin(0, 4, 0, 8));
         LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
         actions.setOrientation(LinearLayout.VERTICAL);
         Button buyPlan = goldButton("Comprar premium");
-        buyPlan.setTextSize(14);
-        buyPlan.setMinHeight(dp(48));
+        buyPlan.setTextSize(16);
+        buyPlan.setMinHeight(dp(52));
         buyPlan.setOnClickListener(v -> openPremiumRequest(purchasePlan));
-        actions.addView(buyPlan, new LinearLayout.LayoutParams(-1, dp(48)));
+        actions.addView(buyPlan, new LinearLayout.LayoutParams(-1, -2));
         Button alreadyPremium = secondaryButton("Ya soy premium");
-        alreadyPremium.setTextSize(13);
-        alreadyPremium.setMinHeight(dp(44));
+        alreadyPremium.setTextSize(16);
+        alreadyPremium.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        alreadyPremium.setMinHeight(dp(52));
+        alreadyPremium.setPadding(dp(12), dp(10), dp(12), dp(10));
+        alreadyPremium.setTextColor(isDarkTheme() ? Color.rgb(255, 222, 148) : Color.rgb(107, 71, 0));
+        alreadyPremium.setBackground(roundRect(isDarkTheme() ? Color.rgb(40, 32, 22)
+                : Color.rgb(255, 244, 218), 14,
+                isDarkTheme() ? Color.rgb(255, 204, 76) : Color.rgb(168, 115, 0)));
         alreadyPremium.setOnClickListener(v -> promptPremiumActivationToken());
-        actions.addView(alreadyPremium, margin(0, 7, 0, 0));
+        actions.addView(alreadyPremium, margin(0, 8, 0, 0));
         offer.addView(actions);
         return offer;
     }
@@ -1946,7 +1883,11 @@ public final class MainActivity extends Activity {
         logo.setBackground(roundRect(Color.WHITE, 8, 0));
         logo.setPadding(dp(2), dp(2), dp(2), dp(2));
         chip.addView(logo, new LinearLayout.LayoutParams(dp(34), dp(34)));
-        chip.addView(text(label, 12, true), margin(7, 0, 0, 0));
+        TextView labelView = text(label, 12, true);
+        labelView.setTextColor(Color.WHITE);
+        LinearLayout.LayoutParams labelLayout = new LinearLayout.LayoutParams(0, -2, 1f);
+        labelLayout.setMargins(dp(7), 0, 0, 0);
+        chip.addView(labelView, labelLayout);
         return chip;
     }
 

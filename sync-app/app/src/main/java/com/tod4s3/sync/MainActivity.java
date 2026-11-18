@@ -535,32 +535,60 @@ public final class MainActivity extends Activity {
         }
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(22), dp(20), dp(22), dp(18));
-        content.setBackground(roundRect(isDarkTheme() ? Color.rgb(23, 25, 36) : surfaceColor(), 28, borderColor()));
-
-        TextView heading = text("Actualización disponible", 20, true);
-        heading.setTextColor(accentColor());
-        content.addView(heading);
+        content.setPadding(dp(22), dp(10), dp(22), dp(18));
+        content.setBackground(roundRect(Color.rgb(24, 29, 42), 28, Color.rgb(55, 65, 84)));
+        View handle = new View(this);
+        handle.setBackground(roundRect(Color.rgb(105, 117, 139), 6, 0));
+        LinearLayout.LayoutParams handleParams = new LinearLayout.LayoutParams(dp(42), dp(5));
+        handleParams.gravity = Gravity.CENTER_HORIZONTAL;
+        content.addView(handle, handleParams);
+        TextView icon = text("↑", 28, true);
+        icon.setGravity(Gravity.CENTER);
+        icon.setTextColor(Color.WHITE);
+        icon.setBackground(roundRect(Color.rgb(242, 30, 58), 40, Color.rgb(255, 74, 94)));
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(58), dp(58));
+        iconParams.gravity = Gravity.CENTER_HORIZONTAL;
+        iconParams.topMargin = dp(16);
+        content.addView(icon, iconParams);
+        TextView heading = text("Actualización disponible", 21, true);
+        heading.setGravity(Gravity.CENTER);
+        content.addView(heading, margin(0, 14, 0, 7));
         TextView version = text("v" + versionName + "  ·  2,3 MB", 12, true);
-        version.setTextColor(Color.rgb(63, 211, 231));
         version.setGravity(Gravity.CENTER);
-        version.setBackground(roundRect(isDarkTheme() ? Color.rgb(16, 38, 49) : Color.rgb(232, 249, 252), 12, 0));
-        content.addView(version, margin(0, 3, 0, 13));
-        content.addView(text("NOVEDADES", 10, true), margin(0, 4, 0, 4));
-        content.addView(bodyText("• Descargas más rápidas y estables\n• Menú y pantallas rediseñados\n• Correcciones menores"));
-        TextView warning = bodyText("Si rechazas esta misma versión 3 veces, se bloqueará el acceso a la APK en este teléfono.");
-        warning.setTextSize(11);
-        warning.setTextColor(secondaryTextColor());
-        content.addView(warning, margin(0, 10, 0, 17));
-
-        LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.VERTICAL);
-        actions.setGravity(Gravity.CENTER_HORIZONTAL);
-        Button reject = secondaryButton("Rechazar");
-        Button update = primaryButton("Actualizar");
-        actions.addView(update, new LinearLayout.LayoutParams(-1, dp(50)));
-        actions.addView(reject, margin(0, 6, 0, 0));
-        content.addView(actions);
+        version.setTextColor(Color.rgb(96, 226, 244));
+        version.setPadding(dp(12), dp(5), dp(12), dp(5));
+        version.setBackground(roundRect(Color.rgb(25, 54, 67), 18, Color.rgb(43, 145, 161)));
+        LinearLayout.LayoutParams versionParams = new LinearLayout.LayoutParams(-2, -2);
+        versionParams.gravity = Gravity.CENTER_HORIZONTAL;
+        content.addView(version, versionParams);
+        content.addView(text("NOVEDADES", 10, true), margin(0, 22, 0, 4));
+        content.addView(bodyText("• Descargas más rápidas y estables\n• Menú lateral rediseñado\n• Correcciones menores"));
+        LinearLayout rejection = new LinearLayout(this);
+        rejection.setOrientation(LinearLayout.VERTICAL);
+        rejection.setPadding(dp(12), dp(9), dp(12), dp(8));
+        rejection.setBackground(roundRect(Color.rgb(29, 33, 46), 14, Color.rgb(52, 61, 80)));
+        LinearLayout rejectionTop = new LinearLayout(this);
+        rejectionTop.setGravity(Gravity.CENTER_VERTICAL);
+        TextView rejectionLabel = text("Rechazos de esta versión", 11, true);
+        rejectionTop.addView(rejectionLabel, new LinearLayout.LayoutParams(0, -2, 1f));
+        TextView rejectionCount = text("1 de 3", 11, true);
+        rejectionCount.setTextColor(Color.rgb(255, 111, 132));
+        rejectionTop.addView(rejectionCount);
+        rejection.addView(rejectionTop);
+        TextView dots = text("●  ○  ○", 17, true);
+        dots.setTextColor(Color.rgb(242, 30, 58));
+        rejection.addView(dots, margin(0, 2, 0, 0));
+        content.addView(rejection, margin(0, 18, 0, 12));
+        TextView update = text("ACTUALIZAR AHORA", 13, true);
+        update.setGravity(Gravity.CENTER);
+        update.setTextColor(Color.WHITE);
+        update.setBackground(roundRect(Color.rgb(242, 30, 58), 18, Color.rgb(255, 74, 94)));
+        content.addView(update, new LinearLayout.LayoutParams(-1, dp(52)));
+        TextView reject = text("Rechazar actualización", 12, true);
+        reject.setGravity(Gravity.CENTER);
+        reject.setTextColor(Color.rgb(180, 188, 204));
+        reject.setBackground(roundRect(Color.TRANSPARENT, 16, Color.rgb(73, 83, 103)));
+        content.addView(reject, margin(0, 8, 0, 0));
 
         Dialog dialog = new Dialog(this);
         dialog.setContentView(content);
@@ -578,8 +606,12 @@ public final class MainActivity extends Activity {
         Window window = dialog.getWindow();
         if (window != null) {
             window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            int availableWidth = getResources().getDisplayMetrics().widthPixels - dp(40);
-            window.setLayout(Math.min(dp(440), availableWidth), WindowManager.LayoutParams.WRAP_CONTENT);
+            window.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT);
+            window.setGravity(Gravity.BOTTOM);
+            WindowManager.LayoutParams updateParams = window.getAttributes();
+            updateParams.dimAmount = 0.72f;
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            window.setAttributes(updateParams);
         }
     }
     private void declineAppUpdate(int versionCode, String versionName, String apkUrl, String expectedSha256) {
@@ -1287,7 +1319,7 @@ public final class MainActivity extends Activity {
         orbit.setIndeterminateTintList(ColorStateList.valueOf(Color.rgb(242, 30, 58)));
         emblem.addView(orbit, new FrameLayout.LayoutParams(dp(132), dp(132), Gravity.CENTER));
         ImageView logo = new ImageView(this);
-        logo.setImageResource(R.mipmap.ic_launcher);
+        logo.setImageResource(R.drawable.tod4s3_logo);
         logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
         logo.setContentDescription("Logo de Tod4S3 Sync, descarga en curso");
         FrameLayout.LayoutParams logoLayout = new FrameLayout.LayoutParams(dp(78), dp(78), Gravity.CENTER);

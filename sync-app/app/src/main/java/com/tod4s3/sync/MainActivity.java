@@ -4440,9 +4440,9 @@ public final class MainActivity extends Activity {
             if (showingAiChat && scrollY != 0) appScroll.scrollTo(0, 0);
         });
         showPage(page, animated);
-        appScroll.post(() -> {
-            if (!showingAiChat || page.getParent() != appScroll) return;
-            int visibleHeight = appScroll.getHeight();
+        appRoot.post(() -> {
+            if (!showingAiChat || page.getParent() != appRoot) return;
+            int visibleHeight = appRoot.getHeight();
             if (visibleHeight <= 0) return;
             page.setMinimumHeight(0);
             FrameLayout.LayoutParams pageParams = (FrameLayout.LayoutParams) page.getLayoutParams();
@@ -6278,10 +6278,7 @@ public final class MainActivity extends Activity {
 
     private void showPage(LinearLayout page, boolean animated) {
         boolean aiPage = showingAiChat;
-        if (aiPage) {
-            appScroll.setFillViewport(true);
-            appScroll.setPadding(0, 0, 0, 0);
-        } else {
+        if (!aiPage) {
             appScroll.setFillViewport(false);
             appScroll.setPadding(0, 0, 0, dp(120));
         }
@@ -6297,12 +6294,26 @@ public final class MainActivity extends Activity {
         }
         if (currentPage != null) currentPage.animate().cancel();
         page.animate().cancel();
+        if (currentPage != null && currentPage.getParent() == appRoot) {
+            appRoot.removeView(currentPage);
+        } else if (currentPage != null && currentPage.getParent() == appScroll) {
+            appScroll.removeView(currentPage);
+        }
+        if (aiPage) {
+            if (appScroll.getParent() == appRoot) appRoot.removeView(appScroll);
+        } else if (appScroll.getParent() != appRoot) {
+            appRoot.addView(appScroll, 0, new FrameLayout.LayoutParams(-1, -1));
+        }
         appScroll.removeAllViews();
         currentPage = page;
         page.setVisibility(View.VISIBLE);
         page.setAlpha(animated ? 0f : 1f);
         page.setTranslationY(animated ? dp(12) : 0f);
-        appScroll.addView(page, new FrameLayout.LayoutParams(-1, aiPage ? -1 : -2));
+        if (aiPage) {
+            appRoot.addView(page, new FrameLayout.LayoutParams(-1, -1));
+        } else {
+            appScroll.addView(page, new FrameLayout.LayoutParams(-1, -2));
+        }
         if (animated) {
             page.animate().alpha(1f).translationY(0f).setDuration(180)
                     .setInterpolator(new DecelerateInterpolator()).start();

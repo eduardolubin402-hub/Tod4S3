@@ -3238,6 +3238,7 @@ public final class MainActivity extends Activity {
 
     private boolean startDirectLinkTask(DirectLinkTask task) {
         if (!hasPublicDownloadPermission()) return false;
+        requestNotificationPermissionIfNeeded();
         int maxConcurrent = Math.max(1, Math.min(5, prefs.getInt(PREF_DOWNLOAD_CONCURRENCY, 3)));
         int otherActive;
         synchronized (downloadConcurrencyLock) { otherActive = activeDownloadJobs; }
@@ -5320,16 +5321,18 @@ public final class MainActivity extends Activity {
         avatar.setElevation(dp(3));
         avatar.setContentDescription("Abrir menú ☰");
         ImageView logo = new ImageView(this);
-        logo.setImageResource(R.drawable.ic_launcher_foreground);
+        logo.setImageResource(R.drawable.tod4s3_logo);
         logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        logo.setPadding(dp(9), dp(9), dp(9), dp(9));
+        logo.setPadding(dp(11), dp(11), dp(11), dp(11));
         avatar.addView(logo, new FrameLayout.LayoutParams(dp(48), dp(48), Gravity.CENTER));
         loadTelegramProfilePhoto(logo);
         TextView bars = text("☰", 11, true);
         bars.setGravity(Gravity.CENTER);
         bars.setTextColor(Color.rgb(40, 27, 6));
         bars.setBackground(roundRect(Color.rgb(242, 198, 106), 10, Color.rgb(7, 17, 31)));
-        FrameLayout.LayoutParams badge = new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.BOTTOM | Gravity.END);
+        FrameLayout.LayoutParams badge = new FrameLayout.LayoutParams(dp(18), dp(18), Gravity.BOTTOM | Gravity.END);
+        badge.rightMargin = dp(2);
+        badge.bottomMargin = dp(2);
         avatar.addView(bars, badge);
         avatar.setOnClickListener(this::showNavigationDrawer);
         avatar.setOnTouchListener((view, event) -> {
@@ -6882,6 +6885,7 @@ public final class MainActivity extends Activity {
 
     private boolean startToDusDownload(ToDusDownloadTask task) {
         if (!hasPublicDownloadPermission()) return false;
+        requestNotificationPermissionIfNeeded();
         final String sessionToken = todusToken;
         if (sessionToken == null || sessionToken.isEmpty()) {
             Toast.makeText(this, "Conecta tu cuenta ToDus antes de descargar.", Toast.LENGTH_LONG).show();

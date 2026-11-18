@@ -1,7 +1,8 @@
 {
-  "version_code": 103,
-  "version_name": "1.5.58",
+  "version_code": 104,
+  "version_name": "1.5.59",
   "manifest_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/web/android-update.json",
-  "apk_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/Tod4S3-Sync-v1.5.58.apk",
-  "sha256": "6675ffa414b7418c08ab93c386fa35119a582e7b1762b6058d6a6489c05c8be3"
+  "apk_url": "https://raw.githubusercontent.com/eduardolubin402-hub/Tod4S3/main/Tod4S3-Sync-v1.5.59.apk",
+  "sha256": "db7ed877dbbf19e4349d67121c9d2651a7b77692469a9ac20074ccc6aa63b0c8",
+  "release_notes": "Notificación visible de descargas activas, nuevo canal de progreso, icono sólido y logo sin cuadrado negro."
 }

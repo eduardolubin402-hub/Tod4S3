@@ -15,7 +15,7 @@ public final class DownloadKeepAliveService extends Service {
     public static final String ACTION_STOP = "com.tod4s3.sync.action.STOP_DOWNLOAD_STATUS";
     public static final String EXTRA_COUNT = "download_count";
     public static final String EXTRA_PERCENT = "download_percent";
-    private static final String CHANNEL_ID = "download_progress_v1";
+    private static final String CHANNEL_ID = "download_progress_v2";
     private static final int NOTIFICATION_ID = 8810;
 
     @Override public void onCreate() {
@@ -46,7 +46,7 @@ public final class DownloadKeepAliveService extends Service {
         NotificationManager manager = getSystemService(NotificationManager.class);
         if (manager == null || manager.getNotificationChannel(CHANNEL_ID) != null) return;
         NotificationChannel channel = new NotificationChannel(CHANNEL_ID,
-                "Descargas en curso", NotificationManager.IMPORTANCE_LOW);
+                "Descargas en curso", NotificationManager.IMPORTANCE_DEFAULT);
         channel.setDescription("Muestra el progreso de archivos que siguen descargándose en segundo plano.");
         channel.setShowBadge(false);
         manager.createNotificationChannel(channel);
@@ -60,7 +60,7 @@ public final class DownloadKeepAliveService extends Service {
         PendingIntent contentIntent = PendingIntent.getActivity(this, 8811, openApp, flags);
         Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 ? new Notification.Builder(this, CHANNEL_ID) : new Notification.Builder(this);
-        builder.setSmallIcon(R.drawable.ic_active_download)
+        builder.setSmallIcon(R.drawable.ic_download_arrow)
                 .setContentTitle(count == 1 ? "Descarga en curso" : count + " descargas en curso")
                 .setContentText(percent >= 0 ? "Tod4S3 Sync · " + Math.min(100, percent) + "% completado"
                         : "Tod4S3 Sync · descargando en segundo plano")

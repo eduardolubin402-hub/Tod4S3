@@ -260,7 +260,7 @@ public final class MainActivity extends Activity {
     private ScrollView aiConversationScroll;
     private LinearLayout aiConversationBox;
     private EditText aiComposer;
-    private Button aiSendButton;
+    private ImageButton aiSendButton;
     private View aiMicButton;
     private SpeechRecognizer aiSpeechRecognizer;
     private Intent aiSpeechIntent;
@@ -4316,8 +4316,10 @@ public final class MainActivity extends Activity {
         aiChatStatus.setTextColor(Color.rgb(53, 224, 140));
         identity.addView(aiChatStatus, margin(0, 1, 0, 0));
         header.addView(identity, new LinearLayout.LayoutParams(0, -2, 1f));
-        Button newChat = secondaryButton("");
-        setButtonIcon(newChat, R.drawable.ic_edit, Color.WHITE);
+        ImageButton newChat = new ImageButton(this);
+        newChat.setImageResource(R.drawable.ic_edit);
+        newChat.setColorFilter(Color.WHITE);
+        newChat.setBackground(roundRect(Color.rgb(29, 31, 40), 15, Color.rgb(78, 82, 98)));
         newChat.setContentDescription("Nuevo chat");
         newChat.setPadding(0, 0, 0, 0);
         newChat.setOnClickListener(this::showAiChatOptions);
@@ -4348,10 +4350,15 @@ public final class MainActivity extends Activity {
         page.addView(aiActivityPanel, new LinearLayout.LayoutParams(0, 0));
 
         aiVoiceToggle = new Switch(this);
-        aiVoiceToggle.setVisibility(View.GONE);
+        aiVoiceToggle.setText("La IA me habla");
+        aiVoiceToggle.setTextSize(12);
+        aiVoiceToggle.setTextColor(Color.rgb(170, 176, 194));
+        aiVoiceToggle.setGravity(Gravity.CENTER_VERTICAL);
+        aiVoiceToggle.setContentDescription("Activar o desactivar que AiTod4S3 responda hablando");
         aiVoiceToggle.setChecked(prefs.getBoolean(PREF_AI_VOICE_MODE, false));
         aiVoiceToggle.setOnCheckedChangeListener((button, enabled) -> setAiVoiceMode(enabled));
         if (aiVoiceToggle.isChecked()) ensureAiTextToSpeech();
+        page.addView(aiVoiceToggle, margin(0, 4, 0, 4));
 
         FrameLayout composerShell = new FrameLayout(this);
         composerShell.setPadding(dp(7), dp(6), dp(7), dp(6));
@@ -4381,11 +4388,10 @@ public final class MainActivity extends Activity {
         ((ImageButton) aiMicButton).setBackground(roundRect(Color.argb(18, 255, 255, 255), 22, Color.argb(52, 255, 255, 255)));
         aiMicButton.setContentDescription("Dictar pregunta");
         composer.addView(aiMicButton, new LinearLayout.LayoutParams(dp(42), dp(42)));
-        aiSendButton = primaryButton("");
-        setButtonIcon(aiSendButton, R.drawable.ic_send, Color.WHITE);
+        aiSendButton = new ImageButton(this);
+        aiSendButton.setImageResource(R.drawable.ic_send);
+        aiSendButton.setColorFilter(Color.WHITE);
         aiSendButton.setPadding(0, 0, 0, 0);
-        aiSendButton.setMinHeight(0);
-        aiSendButton.setMinWidth(0);
         aiSendButton.setBackground(gradientRect(new int[]{Color.rgb(255, 59, 87), Color.rgb(193, 18, 46)}, 24, 0));
         composer.addView(aiSendButton, new LinearLayout.LayoutParams(dp(44), dp(44)));
         composerShell.addView(composer, new FrameLayout.LayoutParams(-1, -1));
@@ -4432,7 +4438,7 @@ public final class MainActivity extends Activity {
         }
         if (aiMicButton != null) aiMicButton.setVisibility(visible ? View.GONE : View.VISIBLE);
         if (aiSendButton != null) {
-            setButtonIcon(aiSendButton, visible ? R.drawable.ic_pause : R.drawable.ic_send, Color.WHITE);
+            setAiImageIcon(aiSendButton, visible ? R.drawable.ic_pause : R.drawable.ic_send, Color.WHITE);
             aiSendButton.setContentDescription(visible ? "Pausar respuesta" : "Enviar pregunta");
         }
         if (speaking && visible && aiLargeOrb == null && aiConversationBox != null) {
@@ -4711,15 +4717,25 @@ public final class MainActivity extends Activity {
     }
 
     private void showAiFaqDialog() {
-        new AlertDialog.Builder(this)
-                .setTitle("Preguntas frecuentes")
-                .setItems(AI_FAQ_LABELS, (dialog, which) -> {
-                    if (which >= 0 && which < AI_FAQ_PROMPTS.length) {
-                        sendAiQuickQuestion(AI_FAQ_PROMPTS[which]);
-                    }
-                })
-                .setNegativeButton("Cerrar", null)
-                .show();
+        LinearLayout panel = aiDialogPanel();
+        panel.addView(text("Preguntas frecuentes", 19, true), margin(4, 2, 4, 10));
+        for (int i = 0; i < AI_FAQ_LABELS.length; i++) {
+            final int index = i;
+            TextView item = text(AI_FAQ_LABELS[i], 14, true);
+            item.setGravity(Gravity.CENTER_VERTICAL);
+            item.setPadding(dp(14), dp(10), dp(14), dp(10));
+            item.setTextColor(Color.rgb(233, 235, 243));
+            item.setBackground(roundRect(Color.rgb(18, 19, 26), 14, Color.rgb(78, 82, 98)));
+            item.setOnClickListener(v -> { ((Dialog) v.getTag()).dismiss(); sendAiQuickQuestion(AI_FAQ_PROMPTS[index]); });
+            panel.addView(item, margin(0, 0, 0, 6));
+        }
+        TextView close = text("Cerrar", 13, true);
+        close.setGravity(Gravity.CENTER);
+        close.setTextColor(Color.rgb(255, 122, 137));
+        panel.addView(close, new LinearLayout.LayoutParams(-1, dp(42)));
+        Dialog dialog = showAiDialogPanel(panel);
+        for (int i = 1; i < panel.getChildCount() - 1; i++) panel.getChildAt(i).setTag(dialog);
+        close.setOnClickListener(v -> dialog.dismiss());
     }
 
     private void sendAiQuickQuestion(String question) {
@@ -4789,11 +4805,43 @@ public final class MainActivity extends Activity {
     }
 
     private void showAiHelp() {
-        new AlertDialog.Builder(this)
-                .setTitle("Help Me  ·  AiTod4S3")
-                .setMessage("Pregúntame sobre temas generales o sobre Tod4S3 Sync. También puedes tocar una pregunta frecuente para recibir pasos de solución sobre actualizaciones, descargas, registro o errores de la app.")
-                .setPositiveButton("Entendido", null)
-                .show();
+        LinearLayout panel = aiDialogPanel();
+        panel.addView(text("Help Me  ·  AiTod4S3", 19, true), margin(4, 2, 4, 10));
+        TextView message = bodyText("Pregúntame sobre temas generales o sobre Tod4S3 Sync. También puedes tocar una pregunta frecuente para recibir pasos de solución sobre actualizaciones, descargas, registro o errores de la app.");
+        message.setTextColor(Color.rgb(233, 235, 243));
+        panel.addView(message, margin(4, 0, 4, 16));
+        TextView close = text("Entendido", 14, true);
+        close.setGravity(Gravity.CENTER);
+        close.setTextColor(Color.WHITE);
+        close.setBackground(gradientRect(new int[]{Color.rgb(255, 59, 87), Color.rgb(193, 18, 46)}, 18, 0));
+        panel.addView(close, new LinearLayout.LayoutParams(-1, dp(48)));
+        Dialog dialog = showAiDialogPanel(panel);
+        close.setOnClickListener(v -> dialog.dismiss());
+    }
+
+    private LinearLayout aiDialogPanel() {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(20), dp(18), dp(20), dp(14));
+        panel.setBackground(roundRect(Color.rgb(10, 11, 16), 24, Color.rgb(78, 82, 98)));
+        return panel;
+    }
+
+    private Dialog showAiDialogPanel(LinearLayout panel) {
+        Dialog dialog = new Dialog(this);
+        dialog.setContentView(panel);
+        dialog.setCancelable(true);
+        dialog.show();
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            window.setLayout(Math.min(dp(380), getResources().getDisplayMetrics().widthPixels - dp(32)), WindowManager.LayoutParams.WRAP_CONTENT);
+            WindowManager.LayoutParams attrs = window.getAttributes();
+            attrs.dimAmount = 0.82f;
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            window.setAttributes(attrs);
+        }
+        return dialog;
     }
 
     private void copyAiMessage(String content) {
@@ -4848,17 +4896,32 @@ public final class MainActivity extends Activity {
     }
 
     private void confirmClearAiChat() {
-        new AlertDialog.Builder(this)
-                .setTitle("Limpiar conversación")
-                .setMessage("Se borrará el historial de AiTod4S3 guardado en este teléfono.")
-                .setNegativeButton("Cancelar", null)
-                .setPositiveButton("Limpiar", (dialog, which) -> {
-                    aiChatMessages.clear();
-                    persistAiChatHistory();
-                    renderAiConversation();
-                    if (aiChatStatus != null) aiChatStatus.setText("Conversación limpia");
-                })
-                .show();
+        LinearLayout panel = aiDialogPanel();
+        panel.addView(text("Limpiar conversación", 19, true), margin(4, 2, 4, 8));
+        panel.addView(bodyText("Se borrará el historial de AiTod4S3 guardado en este teléfono."), margin(4, 0, 4, 16));
+        LinearLayout actions = new LinearLayout(this);
+        actions.setGravity(Gravity.CENTER);
+        TextView cancel = text("Cancelar", 13, true);
+        cancel.setGravity(Gravity.CENTER);
+        cancel.setTextColor(Color.rgb(170, 176, 194));
+        TextView clear = text("Limpiar", 13, true);
+        clear.setGravity(Gravity.CENTER);
+        clear.setTextColor(Color.WHITE);
+        clear.setBackground(gradientRect(new int[]{Color.rgb(255, 59, 87), Color.rgb(193, 18, 46)}, 18, 0));
+        actions.addView(cancel, new LinearLayout.LayoutParams(0, dp(46), 1f));
+        LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(0, dp(46), 1f);
+        clearParams.setMargins(dp(8), 0, 0, 0);
+        actions.addView(clear, clearParams);
+        panel.addView(actions);
+        Dialog dialog = showAiDialogPanel(panel);
+        cancel.setOnClickListener(v -> dialog.dismiss());
+        clear.setOnClickListener(v -> {
+            aiChatMessages.clear();
+            persistAiChatHistory();
+            renderAiConversation();
+            if (aiChatStatus != null) aiChatStatus.setText("Conversación limpia");
+            dialog.dismiss();
+        });
     }
 
     private void sendAiMessage() {
@@ -4892,7 +4955,7 @@ public final class MainActivity extends Activity {
         setAiActivityState("AiTod4S3 está escribiendo…", false, true);
         startAiThinkingTimeline();
         aiSendButton.setEnabled(false);
-        aiSendButton.setText("…");
+        setAiImageIcon(aiSendButton, R.drawable.ic_pause, Color.WHITE);
         aiChatStatus.setText("PREPARANDO TU RESPUESTA");
         final int requestGeneration = appAccessGeneration;
         JSONArray messages = new JSONArray();
@@ -4977,7 +5040,7 @@ public final class MainActivity extends Activity {
                 }
                 if (aiSendButton != null) {
                     aiSendButton.setEnabled(!aiChatRequestInFlight);
-                    if (!aiChatRequestInFlight) setButtonIcon(aiSendButton, R.drawable.ic_send, Color.WHITE);
+                    if (!aiChatRequestInFlight) setAiImageIcon(aiSendButton, R.drawable.ic_send, Color.WHITE);
                 }
             });
         }, "aitod4s3-chat").start();
@@ -4989,7 +5052,7 @@ public final class MainActivity extends Activity {
                 || requestGeneration != appAccessGeneration || isFinishing()) {
             aiChatRequestInFlight = false;
             stopAiThinkingTimeline();
-            if (aiSendButton != null) { aiSendButton.setEnabled(true); setButtonIcon(aiSendButton, R.drawable.ic_send, Color.WHITE); }
+            if (aiSendButton != null) { aiSendButton.setEnabled(true); setAiImageIcon(aiSendButton, R.drawable.ic_send, Color.WHITE); }
             return;
         }
         AiChatMessage message = aiChatMessages.get(aiChatMessages.size() - 1);
@@ -5015,7 +5078,7 @@ public final class MainActivity extends Activity {
             aiChatStatus.setText("RESPUESTA LISTA");
             setAiActivityState("Respuesta lista", false, false);
         }
-        if (aiSendButton != null) { aiSendButton.setEnabled(true); setButtonIcon(aiSendButton, R.drawable.ic_send, Color.WHITE); }
+        if (aiSendButton != null) { aiSendButton.setEnabled(true); setAiImageIcon(aiSendButton, R.drawable.ic_send, Color.WHITE); }
     }
 
     private void setAiVoiceMode(boolean enabled) {
@@ -5175,6 +5238,13 @@ public final class MainActivity extends Activity {
         button.setCompoundDrawablesRelative(icon, null, null, null);
         button.setCompoundDrawablePadding(dp(9));
         button.setGravity(Gravity.CENTER);
+    }
+
+    private void setAiImageIcon(ImageButton button, int iconResource, int tint) {
+        if (button == null) return;
+        button.setImageResource(iconResource);
+        button.setColorFilter(tint);
+        button.setScaleType(ImageView.ScaleType.CENTER);
     }
 
     private FrameLayout iconBadge(int iconResource, int iconTint, int backgroundColor) {

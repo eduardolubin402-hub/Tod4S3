@@ -261,9 +261,13 @@ public final class MainActivity extends Activity {
     private LinearLayout aiConversationBox;
     private EditText aiComposer;
     private ImageButton aiSendButton;
+    private ImageButton aiCallButton;
     private View aiMicButton;
     private SpeechRecognizer aiSpeechRecognizer;
     private Intent aiSpeechIntent;
+    private boolean aiVoiceCallActive;
+    private boolean aiVoiceCallListening;
+    private boolean aiVoiceCallWaitingForReply;
     private FrameLayout aiLargeOrb;
     private ObjectAnimator aiSpeakingOrbAnimator;
     private Switch aiVoiceToggle;
@@ -4323,6 +4327,16 @@ public final class MainActivity extends Activity {
         newChat.setContentDescription("Nuevo chat");
         newChat.setPadding(0, 0, 0, 0);
         newChat.setOnClickListener(this::showAiChatOptions);
+        aiCallButton = new ImageButton(this);
+        aiCallButton.setImageResource(R.drawable.ic_call_voice);
+        aiCallButton.setColorFilter(Color.WHITE);
+        aiCallButton.setPadding(0, 0, 0, 0);
+        aiCallButton.setBackground(roundRect(Color.rgb(29, 31, 40), 15, Color.rgb(78, 82, 98)));
+        aiCallButton.setContentDescription("Iniciar llamada de voz con AiTod4S3");
+        aiCallButton.setOnClickListener(v -> toggleAiVoiceCall());
+        LinearLayout.LayoutParams callParams = new LinearLayout.LayoutParams(dp(42), dp(42));
+        callParams.setMargins(dp(7), 0, dp(7), 0);
+        header.addView(aiCallButton, callParams);
         header.addView(newChat, new LinearLayout.LayoutParams(dp(42), dp(42)));
         page.addView(header, margin(0, 0, 0, 7));
 
@@ -4760,37 +4774,57 @@ public final class MainActivity extends Activity {
             requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_AI_AUDIO_PERMISSION);
             return;
         }
+        beginAiSpeechRecognition(false);
+    }
+    private void beginAiSpeechRecognition(boolean callMode) {
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
             Toast.makeText(this, "El dictado de voz no está disponible en este teléfono.", Toast.LENGTH_LONG).show();
+            if (callMode) stopAiVoiceCall();
             return;
         }
         if (aiSpeechRecognizer != null) aiSpeechRecognizer.destroy();
         aiSpeechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
         aiSpeechRecognizer.setRecognitionListener(new RecognitionListener() {
             @Override public void onReadyForSpeech(Bundle params) {
-                if (aiChatStatus != null) aiChatStatus.setText("escuchando…");
+                aiVoiceCallListening = callMode;
+                if (aiChatStatus != null) aiChatStatus.setText(callMode ? "LLAMADA · ESCUCHANDO" : "escuchando…");
                 if (aiMicButton != null) aiMicButton.setAlpha(0.55f);
             }
             @Override public void onBeginningOfSpeech() { }
             @Override public void onRmsChanged(float rmsdB) { }
             @Override public void onBufferReceived(byte[] buffer) { }
-            @Override public void onEndOfSpeech() { }
+            @Override public void onEndOfSpeech() {
+                if (callMode && aiChatStatus != null) aiChatStatus.setText("LLAMADA · PROCESANDO");
+            }
             @Override public void onError(int error) {
+                aiVoiceCallListening = false;
                 if (aiMicButton != null) aiMicButton.setAlpha(1f);
-                if (aiChatStatus != null) aiChatStatus.setText("en línea");
-                if (error != SpeechRecognizer.ERROR_NO_MATCH && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
+                if (callMode && aiVoiceCallActive && !aiChatRequestInFlight) {
+                    handler.postDelayed(() -> {
+                        if (aiVoiceCallActive && !aiChatRequestInFlight) beginAiSpeechRecognition(true);
+                    }, 350L);
+                } else if (aiChatStatus != null) {
+                    aiChatStatus.setText("en línea");
+                }
+                if (!callMode && error != SpeechRecognizer.ERROR_NO_MATCH && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT) {
                     Toast.makeText(MainActivity.this, "No se entendió el audio. Vuelve a intentarlo.", Toast.LENGTH_SHORT).show();
                 }
             }
             @Override public void onResults(Bundle results) {
+                aiVoiceCallListening = false;
                 if (aiMicButton != null) aiMicButton.setAlpha(1f);
                 ArrayList<String> matches = results == null ? null
                         : results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-                if (matches != null && !matches.isEmpty() && aiComposer != null) {
+                if (matches != null && !matches.isEmpty() && aiComposer != null && (!callMode || aiVoiceCallActive)) {
                     aiComposer.setText(matches.get(0));
                     aiComposer.setSelection(aiComposer.length());
                     setAiVoiceMode(true);
+                    if (callMode) aiVoiceCallWaitingForReply = true;
                     sendAiMessage();
+                } else if (callMode && aiVoiceCallActive && !aiChatRequestInFlight) {
+                    handler.postDelayed(() -> {
+                        if (aiVoiceCallActive && !aiChatRequestInFlight) beginAiSpeechRecognition(true);
+                    }, 350L);
                 }
             }
             @Override public void onPartialResults(Bundle partialResults) { }
@@ -4802,6 +4836,46 @@ public final class MainActivity extends Activity {
         aiSpeechIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "es");
         aiSpeechIntent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Habla con AiTod4S3");
         aiSpeechRecognizer.startListening(aiSpeechIntent);
+    }
+    private void toggleAiVoiceCall() {
+        if (aiVoiceCallActive) {
+            stopAiVoiceCall();
+            return;
+        }
+        if (!hasAiPremiumAccess()) {
+            Toast.makeText(this, "La llamada de voz requiere Premium activo y verificado.", Toast.LENGTH_LONG).show();
+            showPlansStep(true);
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            aiVoiceCallActive = true;
+            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_AI_AUDIO_PERMISSION);
+            return;
+        }
+        aiVoiceCallActive = true;
+        aiVoiceCallWaitingForReply = false;
+        setAiVoiceMode(true);
+        updateAiVoiceCallButton();
+        beginAiSpeechRecognition(true);
+    }
+    private void stopAiVoiceCall() {
+        aiVoiceCallActive = false;
+        aiVoiceCallListening = false;
+        aiVoiceCallWaitingForReply = false;
+        if (aiSpeechRecognizer != null) aiSpeechRecognizer.cancel();
+        if (aiTextToSpeech != null) aiTextToSpeech.stop();
+        updateAiVoiceCallButton();
+        setAiVoiceMode(false);
+        if (aiChatStatus != null) aiChatStatus.setText("en línea");
+    }
+    private void updateAiVoiceCallButton() {
+        if (aiCallButton == null) return;
+        aiCallButton.setAlpha(aiVoiceCallActive ? 1f : 0.9f);
+        aiCallButton.setBackground(roundRect(aiVoiceCallActive ? Color.rgb(255, 59, 87) : Color.rgb(29, 31, 40),
+                15, aiVoiceCallActive ? Color.rgb(255, 145, 155) : Color.rgb(78, 82, 98)));
+        aiCallButton.setContentDescription(aiVoiceCallActive
+                ? "Terminar llamada de voz con AiTod4S3" : "Iniciar llamada de voz con AiTod4S3");
     }
 
     private void showAiHelp() {
@@ -5033,6 +5107,12 @@ public final class MainActivity extends Activity {
                         aiChatStatus.setText("NO SE PUDO RESPONDER");
                         setAiActivityState("Inténtalo de nuevo", false, false);
                         aiChatMessages.add(new AiChatMessage("assistant", visibleFailure));
+                        if (aiVoiceCallActive) {
+                            aiVoiceCallWaitingForReply = false;
+                            handler.postDelayed(() -> {
+                                if (aiVoiceCallActive && !aiChatRequestInFlight) beginAiSpeechRecognition(true);
+                            }, 500L);
+                        }
                     }
                     if (aiChatMessages.size() > 24) aiChatMessages.subList(0, aiChatMessages.size() - 24).clear();
                     persistAiChatHistory();
@@ -5131,7 +5211,15 @@ public final class MainActivity extends Activity {
                             runOnUiThread(() -> {
                                 aiLastUtteranceId = "";
                                 setAiActivityState("", false, false);
-                                if (aiChatStatus != null) aiChatStatus.setText("RESPUESTA HABLADA COMPLETA");
+                                if (aiVoiceCallActive) {
+                                    aiVoiceCallWaitingForReply = false;
+                                    if (aiChatStatus != null) aiChatStatus.setText("LLAMADA · ESCUCHANDO");
+                                    handler.postDelayed(() -> {
+                                        if (aiVoiceCallActive && !aiChatRequestInFlight) beginAiSpeechRecognition(true);
+                                    }, 350L);
+                                } else if (aiChatStatus != null) {
+                                    aiChatStatus.setText("RESPUESTA HABLADA COMPLETA");
+                                }
                             });
                         }
                     }
@@ -5141,7 +5229,15 @@ public final class MainActivity extends Activity {
                             runOnUiThread(() -> {
                                 aiLastUtteranceId = "";
                                 setAiActivityState("", false, false);
-                                if (aiChatStatus != null) aiChatStatus.setText("RESPUESTA DISPONIBLE POR TEXTO");
+                                if (aiVoiceCallActive) {
+                                    aiVoiceCallWaitingForReply = false;
+                                    if (aiChatStatus != null) aiChatStatus.setText("LLAMADA · ESCUCHANDO");
+                                    handler.postDelayed(() -> {
+                                        if (aiVoiceCallActive && !aiChatRequestInFlight) beginAiSpeechRecognition(true);
+                                    }, 350L);
+                                } else if (aiChatStatus != null) {
+                                    aiChatStatus.setText("RESPUESTA DISPONIBLE POR TEXTO");
+                                }
                             });
                         }
                     }
@@ -7482,8 +7578,19 @@ public final class MainActivity extends Activity {
         }
         if (requestCode == REQUEST_AI_AUDIO_PERMISSION) {
             boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
-            if (granted) startAiVoiceInput();
-            else Toast.makeText(this, "Concede permiso al micrófono para hablar con AiTod4S3.", Toast.LENGTH_LONG).show();
+            if (granted) {
+                if (aiVoiceCallActive) {
+                    setAiVoiceMode(true);
+                    updateAiVoiceCallButton();
+                    beginAiSpeechRecognition(true);
+                } else {
+                    startAiVoiceInput();
+                }
+            } else {
+                aiVoiceCallActive = false;
+                updateAiVoiceCallButton();
+                Toast.makeText(this, "Concede permiso al micrófono para hablar con AiTod4S3.", Toast.LENGTH_LONG).show();
+            }
             return;
         }
         if (requestCode == REQUEST_WRITE_STORAGE && syncStatus != null) {
@@ -7717,6 +7824,9 @@ public final class MainActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        aiVoiceCallActive = false;
+        aiVoiceCallListening = false;
+        aiVoiceCallWaitingForReply = false;
         handler.removeCallbacks(poller);
         if (dismissLaunchSplashRunnable != null) handler.removeCallbacks(dismissLaunchSplashRunnable);
         stopLaunchSplashAnimations();

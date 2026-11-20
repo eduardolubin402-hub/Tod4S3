@@ -5460,16 +5460,23 @@ async def send_latest_app_release(update: Update, context: ContextTypes.DEFAULT_
     user = update.effective_user
     if not message or not chat or not user:
         return None
-    is_group = is_app_support_group(chat)
-    if not is_group:
-        return None
-
     try:
-        release = await latest_android_release(context.application)
+        release = await latest_android_release(context.application, max_bytes=200 * MIB)
     except Exception as exc:
         log.warning("No se pudo consultar la última versión para el grupo de soporte (%s)", type(exc).__name__)
         await message.reply_text(
             "⚠️ La actualización no está disponible en este momento.\nVuelve a intentarlo más tarde.",
+            disable_web_page_preview=True,
+        )
+        return None
+
+    apk_url = str(release["apk_url"])
+    if len(release["data"]) > BOT_API_SEND_LIMIT:
+        await message.reply_text(
+            "📲 La actualización está disponible, pero Telegram no permite adjuntar "
+            "archivos de más de 50 MiB. Pulsa el botón oficial para descargarla o "
+            "usa «ENVIARME ACTUALIZACIÓN» para recibirla por ToDus.",
+            reply_markup=app_support_keyboard(apk_url=apk_url),
             disable_web_page_preview=True,
         )
         return None
@@ -5553,7 +5560,7 @@ async def send_app_support_answer(update: Update, context: ContextTypes.DEFAULT_
     message = update.effective_message
     chat = update.effective_chat
     user = update.effective_user
-    if not message or not chat or not user or not is_app_support_group(chat):
+    if not message or not chat or not user:
         return
     markup = app_support_keyboard(context.application.bot_data.get("bot_username"))
     await message.reply_text(answer, reply_markup=markup, disable_web_page_preview=True)
@@ -5566,7 +5573,8 @@ async def handle_app_support_keywords(update: Update, context: ContextTypes.DEFA
     if not message or not user or not chat or getattr(user, "is_bot", False):
         return
     is_group = is_app_support_group(chat)
-    if not is_group:
+    is_private = getattr(chat, "type", None) == "private"
+    if not is_group and not is_private:
         return
 
     intent = classify_app_support_intent(message.text or "")

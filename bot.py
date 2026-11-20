@@ -2861,7 +2861,7 @@ def btn(text: str, **kwargs) -> InlineKeyboardButton:
 def main_keyboard(user_id: int | None = None) -> InlineKeyboardMarkup:
     rows = [
         [InlineKeyboardButton("📥 DESCARGAS", callback_data="downloads", style="success")],
-        [InlineKeyboardButton("📲 ENVIARME APK", callback_data="app:send_update", style="success")],
+        [InlineKeyboardButton("📲 ENVIARME APK POR TODUS", callback_data="app:send_update", style="success")],
     ]
 
     app_button = InlineKeyboardButton(

@@ -5633,7 +5633,7 @@ async def app_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def apk_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Envía la última versión del APK publicada y validada en el repositorio."""
     chat = update.effective_chat
-    if not chat or not is_app_support_group(chat):
+    if not chat or getattr(chat, "type", None) not in {"group", "supergroup"}:
         return
     try:
         await send_latest_app_release(update, context)
@@ -9223,6 +9223,8 @@ def main() -> None:
     application.add_handler(CommandHandler("todus", todus_command))
     application.add_handler(CommandHandler("app", app_command))
     application.add_handler(CommandHandler("apk", apk_command))
+    application.add_handler(CommandHandler("actualizacion", apk_command))
+    application.add_handler(CommandHandler("actualiza", apk_command))
     application.add_handler(CommandHandler("top", top_command))
     application.add_handler(CommandHandler("backup", backup_command))
     application.add_handler(CommandHandler("jkadmin", jkadmin_command))

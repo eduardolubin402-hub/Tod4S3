@@ -5471,10 +5471,11 @@ async def send_latest_app_release(update: Update, context: ContextTypes.DEFAULT_
         return None
 
     apk_url = str(release["apk_url"])
-    if len(release["data"]) > BOT_API_SEND_LIMIT:
+    telegram_send_limit = 2 * 1024 * MIB if context.application.bot_data.get("local_bot_api") else BOT_API_SEND_LIMIT
+    if len(release["data"]) > telegram_send_limit:
         await message.reply_text(
             "📲 La actualización está disponible, pero Telegram no permite adjuntar "
-            "archivos de más de 50 MiB. Pulsa el botón oficial para descargarla o "
+            "este archivo desde el API público. Pulsa el botón oficial para descargarla o "
             "usa «ENVIARME ACTUALIZACIÓN» para recibirla por ToDus.",
             reply_markup=app_support_keyboard(apk_url=apk_url),
             disable_web_page_preview=True,

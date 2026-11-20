@@ -261,7 +261,9 @@ def claim_premium_activation_token(token: str, user_id: int, device_id: str,
 
 def record_delivery(user_id: int, task_id: str, filename: str, size: int,
                     parts: list[str], *, storage_backend: str = "todus_native",
-                    remote_delete_supported: bool = False) -> None:
+                    remote_delete_supported: bool = False,
+                    kind: str | None = None, version_code: int | None = None,
+                    version_name: str | None = None, sha256: str | None = None) -> None:
     """Publica una entrega reciente para el usuario vinculado."""
     if not parts:
         return
@@ -281,6 +283,14 @@ def record_delivery(user_id: int, task_id: str, filename: str, size: int,
             "parts": [str(url) for url in parts if str(url).startswith("https://")],
             "created_at": int(time.time()),
         })
+        if kind:
+            deliveries[0]["kind"] = str(kind)[:40]
+        if version_code is not None:
+            deliveries[0]["version_code"] = int(version_code)
+        if version_name:
+            deliveries[0]["version_name"] = str(version_name)[:40]
+        if sha256:
+            deliveries[0]["sha256"] = str(sha256).lower()[:64]
         state["deliveries"][key] = deliveries[:30]
         _write(state)
 

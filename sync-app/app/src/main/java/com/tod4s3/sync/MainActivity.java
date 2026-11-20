@@ -66,6 +66,14 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.webkit.MimeTypeMap;
+import androidx.activity.ComponentActivity;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.activity.result.PickVisualMediaRequest;
+import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia;
+import androidx.work.WorkManager;
+import com.arthenica.ffmpegkit.FFmpegKit;
+import com.arthenica.ffmpegkit.ReturnCode;
 import android.graphics.Color;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -99,7 +107,7 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 
-public final class MainActivity extends Activity {
+public final class MainActivity extends ComponentActivity {
     private static final String API_BASE = "https://tod4s3-production-abe8925f.up.railway.app";
     private static final String UPDATE_MANIFEST_URL = "https://github.com/eduardolubin402-hub/Tod4S3/raw/refs/heads/main/web/android-update.json";
     private static final String LOG_TAG = "Tod4S3Sync";
@@ -342,10 +350,37 @@ public final class MainActivity extends Activity {
     private android.graphics.Bitmap telegramProfileBitmap;
     private boolean telegramProfilePhotoLoading;
     private final ArrayList<ImageView> pendingProfileAvatarViews = new ArrayList<>();
+    private ActivityResultLauncher<PickVisualMediaRequest> toolsPhotoPicker;
+    private ActivityResultLauncher<PickVisualMediaRequest> toolsVideoPicker;
+    private ActivityResultLauncher<String[]> toolsDocumentPicker;
+    private final ArrayList<Uri> toolsSelectedUris = new ArrayList<>();
+    private String toolsMode = "";
+    private int toolsPhotoQuality = 85;
+    private String toolsOutputFormat = "JPG";
+    private String toolsVideoFormat = "MP4";
+    private String toolsAudioFormat = "MP3";
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         prefs = getSharedPreferences("tod4s3_sync", MODE_PRIVATE);
+        toolsPhotoPicker = registerForActivityResult(new ActivityResultContracts.PickMultipleVisualMedia(20), uris -> {
+            if (uris == null || uris.isEmpty()) return;
+            toolsSelectedUris.clear();
+            toolsSelectedUris.addAll(uris);
+            showToolsPhotoConverter(true);
+        });
+        toolsVideoPicker = registerForActivityResult(new PickVisualMedia(), uri -> {
+            if (uri == null) return;
+            toolsSelectedUris.clear();
+            toolsSelectedUris.add(uri);
+            showToolsVideoConverter(true);
+        });
+        toolsDocumentPicker = registerForActivityResult(new ActivityResultContracts.OpenMultipleDocuments(), uris -> {
+            if (uris == null || uris.isEmpty()) return;
+            toolsSelectedUris.clear();
+            toolsSelectedUris.addAll(uris);
+            showToolsZipCompressor(true);
+        });
         token = prefs.getString("token", "");
         premiumActive = prefs.getBoolean(PREF_ACTIVE_PREMIUM, false);
         premiumVerified = prefs.getBoolean(PREF_PREMIUM_VERIFIED, false);
@@ -2303,6 +2338,10 @@ public final class MainActivity extends Activity {
     }
 
     private void showDashboard(String filter, boolean animated) {
+        if ("tools".equals(filter)) {
+            showToolsStep(animated);
+            return;
+        }
         boolean alreadyOnDashboard = viewingDashboard && currentPage != null && dashboardItemsBox != null;
         showingPlansPage = false;
         viewingDashboard = true;
@@ -2464,6 +2503,8 @@ public final class MainActivity extends Activity {
                 () -> showDashboard("all", true), 1f);
         addTextTab(tabs, "Descargas", "completed".equals(dashboardFilter),
                 () -> showDashboard("completed", true), 1f);
+        addTextTab(tabs, "Herramientas", "tools".equals(dashboardFilter),
+                () -> showDashboard("tools", true), 1f);
         return tabs;
     }
 
@@ -2493,6 +2534,312 @@ public final class MainActivity extends Activity {
         params.setMargins(0, 0, 0, 0);
         parent.addView(item, params);
     }
+
+    private void showToolsStep(boolean animated) {
+        viewingDashboard = false;
+        showingPlansPage = false;
+        dashboardFilter = "tools";
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setPadding(dp(14), dp(12), dp(14), dp(120));
+        page.addView(dashboardToolbar(), margin(0, 0, 0, 0));
+        page.addView(dashboardTabs(), margin(0, 12, 0, 0));
+        TextView title = text("Herramientas", 21, true);
+        LinearLayout titleRow = new LinearLayout(this);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+        titleRow.addView(title, new LinearLayout.LayoutParams(0, -2, 1f));
+        TextView local = text("100 % local", 11, true);
+        local.setTextColor(Color.rgb(53, 224, 140));
+        local.setPadding(dp(10), dp(6), dp(10), dp(6));
+        local.setBackground(roundRect(Color.rgb(18, 52, 42), 18, Color.rgb(53, 224, 140)));
+        titleRow.addView(local);
+        page.addView(titleRow, margin(2, 18, 2, 0));
+        TextView subtitle = bodyText("Procesa tus archivos en el teléfono, sin internet.");
+        subtitle.setTextSize(13);
+        page.addView(subtitle, margin(2, 4, 2, 12));
+        page.addView(toolHomeCard("Compresor de archivos", "Reduce el peso de varios archivos en ZIP",
+                R.drawable.ic_folder_zip, new String[]{"ZIP", "3 niveles"}, () -> openToolsDocuments()), margin(0, 0, 0, 10));
+        page.addView(toolHomeCard("Convertidor de video", "Video y audio a otro formato",
+                R.drawable.ic_movie, new String[]{"MP4", "MKV", "WEBM", "MP3"}, () -> openToolsVideo()), margin(0, 0, 0, 10));
+        page.addView(toolHomeCard("Convertidor de fotos", "Cambia el formato de tus imágenes",
+                R.drawable.ic_image, new String[]{"JPG", "PNG", "WEBP"}, () -> openToolsPhotos()), margin(0, 0, 0, 14));
+        JSONArray recent = toolsRecent();
+        if (recent.length() > 0) {
+            page.addView(toolSectionLabel("RECIENTES"), margin(2, 4, 2, 6));
+            for (int i = 0; i < Math.min(5, recent.length()); i++) {
+                try {
+                    JSONObject row = recent.getJSONObject(i);
+                    page.addView(toolRecentRow(row), margin(0, 0, 0, 7));
+                } catch (Exception ignored) { }
+            }
+        }
+        showPage(page, animated);
+    }
+
+    private LinearLayout toolHomeCard(String title, String detail, int icon, String[] chips, Runnable action) {
+        LinearLayout card = card();
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(12), dp(10), dp(10), dp(10));
+        ImageView glyph = new ImageView(this);
+        glyph.setImageResource(icon);
+        glyph.setColorFilter(Color.rgb(255, 138, 150));
+        glyph.setPadding(dp(13), dp(13), dp(13), dp(13));
+        glyph.setBackground(roundRect(Color.rgb(15, 16, 23), 30, Color.rgb(255, 59, 87)));
+        card.addView(glyph, new LinearLayout.LayoutParams(dp(54), dp(54)));
+        LinearLayout texts = new LinearLayout(this);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        texts.setPadding(dp(12), 0, dp(6), 0);
+        texts.addView(text(title, 17, true));
+        TextView description = bodyText(detail);
+        description.setTextSize(12.5f);
+        texts.addView(description, margin(0, 2, 0, 6));
+        LinearLayout chipRow = new LinearLayout(this);
+        for (String chip : chips) chipRow.addView(toolChip(chip, false), margin(0, 0, 5, 0));
+        texts.addView(chipRow);
+        card.addView(texts, new LinearLayout.LayoutParams(0, -2, 1f));
+        ImageView arrow = new ImageView(this);
+        arrow.setImageResource(R.drawable.ic_chevron_right);
+        arrow.setColorFilter(Color.rgb(138, 144, 166));
+        card.addView(arrow, new LinearLayout.LayoutParams(dp(24), dp(40)));
+        card.setOnClickListener(v -> action.run());
+        return card;
+    }
+
+    private TextView toolSectionLabel(String value) {
+        TextView label = text(value, 11, true);
+        label.setTextColor(Color.rgb(109, 115, 132));
+        return label;
+    }
+
+    private TextView toolChip(String value, boolean selected) {
+        TextView chip = text(value, 11, true);
+        chip.setGravity(Gravity.CENTER);
+        chip.setPadding(dp(9), dp(4), dp(9), dp(4));
+        chip.setTextColor(selected ? Color.WHITE : Color.rgb(170, 176, 194));
+        chip.setBackground(selected ? gradientRect(new int[]{Color.rgb(255, 59, 87), Color.rgb(193, 18, 46)}, 18, 0)
+                : roundRect(Color.argb(24, 255, 255, 255), 18, Color.argb(48, 255, 255, 255)));
+        return chip;
+    }
+
+    private LinearLayout toolRecentRow(JSONObject row) {
+        LinearLayout box = card();
+        box.setPadding(dp(12), dp(9), dp(12), dp(9));
+        TextView name = text(row.optString("name", "Archivo"), 13, true);
+        box.addView(name, new LinearLayout.LayoutParams(0, -2, 1f));
+        TextView info = bodyText(row.optString("format", "LOCAL"));
+        info.setTextSize(11);
+        box.addView(info);
+        return box;
+    }
+
+    private JSONArray toolsRecent() {
+        try { return new JSONArray(prefs.getString("tools_recent_v1", "[]")); }
+        catch (Exception e) { return new JSONArray(); }
+    }
+
+    private void addToolsRecent(String name, String format, long before, long after) {
+        try {
+            JSONArray old = toolsRecent();
+            JSONArray next = new JSONArray();
+            JSONObject item = new JSONObject();
+            item.put("name", name);
+            item.put("format", format);
+            item.put("before", before);
+            item.put("after", after);
+            item.put("time", System.currentTimeMillis());
+            next.put(item);
+            for (int i = 0; i < Math.min(4, old.length()); i++) next.put(old.get(i));
+            prefs.edit().putString("tools_recent_v1", next.toString()).apply();
+        } catch (Exception ignored) { }
+    }
+
+    private void openToolsPhotos() {
+        toolsMode = "photos";
+        toolsPhotoPicker.launch(new PickVisualMediaRequest.Builder()
+                .setMediaType(PickVisualMedia.ImageOnly.INSTANCE).build());
+    }
+
+    private void openToolsVideo() {
+        toolsMode = "video";
+        toolsVideoPicker.launch(new PickVisualMediaRequest.Builder()
+                .setMediaType(PickVisualMedia.VideoOnly.INSTANCE).build());
+    }
+
+    private void openToolsDocuments() {
+        toolsMode = "zip";
+        toolsDocumentPicker.launch(new String[]{"*/*"});
+    }
+
+    private void showToolsPhotoConverter(boolean animated) {
+        LinearLayout page = toolsSubPage("Convertidor de fotos");
+        page.addView(toolSelectionSummary("Fotos elegidas", toolsSelectedUris.size(), "Editar"), margin(0, 14, 0, 14));
+        page.addView(toolSectionLabel("CONVERTIR A"), margin(2, 0, 2, 6));
+        LinearLayout formats = new LinearLayout(this);
+        for (String format : new String[]{"JPG", "PNG", "WEBP"}) {
+            TextView choice = toolChip(format, format.equals(toolsOutputFormat));
+            choice.setTextSize(14);
+            choice.setMinHeight(dp(58));
+            choice.setOnClickListener(v -> { toolsOutputFormat = format; showToolsPhotoConverter(false); });
+            formats.addView(choice, new LinearLayout.LayoutParams(0, dp(58), 1f));
+            if (!format.equals("WEBP")) ((LinearLayout.LayoutParams) choice.getLayoutParams()).setMargins(0, 0, dp(8), 0);
+        }
+        page.addView(formats, margin(0, 0, 0, 14));
+        page.addView(toolSectionLabel("CALIDAD"), margin(2, 0, 2, 4));
+        SeekBar quality = new SeekBar(this);
+        quality.setMax(100); quality.setProgress(toolsPhotoQuality);
+        quality.setEnabled(!"PNG".equals(toolsOutputFormat));
+        quality.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar bar, int value, boolean fromUser) { toolsPhotoQuality = Math.max(1, value); }
+            public void onStartTrackingTouch(SeekBar bar) { }
+            public void onStopTrackingTouch(SeekBar bar) { }
+        });
+        page.addView(quality, margin(0, 0, 0, 4));
+        TextView qualityValue = bodyText("Menos peso                                      Mejor calidad");
+        qualityValue.setTextSize(11); page.addView(qualityValue);
+        TextView summary = bodyText(toolsSelectedUris.size() + " fotos → " + toolsOutputFormat
+                + "\nLas originales no se modifican.");
+        page.addView(summary, margin(0, 16, 0, 12));
+        Button convert = primaryButton("Convertir " + toolsSelectedUris.size() + " fotos");
+        convert.setOnClickListener(v -> convertSelectedPhotos());
+        page.addView(convert, new LinearLayout.LayoutParams(-1, dp(56)));
+        showPage(page, animated);
+    }
+
+    private LinearLayout toolsSubPage(String title) {
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setPadding(dp(14), dp(12), dp(14), dp(120));
+        LinearLayout head = new LinearLayout(this); head.setGravity(Gravity.CENTER_VERTICAL);
+        Button back = secondaryButton(""); setButtonIcon(back, R.drawable.ic_arrow_back, Color.WHITE);
+        back.setOnClickListener(v -> showToolsStep(true));
+        head.addView(back, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        head.addView(text(title, 19, true), margin(12, 0, 0, 0));
+        page.addView(head);
+        return page;
+    }
+
+    private LinearLayout toolSelectionSummary(String label, int count, String action) {
+        LinearLayout box = card(); box.setOrientation(LinearLayout.HORIZONTAL); box.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView icon = new ImageView(this); icon.setImageResource(R.drawable.ic_file_card); icon.setColorFilter(Color.rgb(56, 225, 255));
+        box.addView(icon, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        TextView countText = text(count + " " + label.toLowerCase(java.util.Locale.ROOT), 15, true);
+        box.addView(countText, new LinearLayout.LayoutParams(0, -2, 1f));
+        Button edit = secondaryButton(action); edit.setTextSize(11); box.addView(edit, new LinearLayout.LayoutParams(-2, dp(40)));
+        return box;
+    }
+
+    private void convertSelectedPhotos() {
+        if (toolsSelectedUris.isEmpty()) return;
+        final ArrayList<Uri> inputs = new ArrayList<>(toolsSelectedUris);
+        new Thread(() -> {
+            int done = 0; long before = 0, after = 0;
+            try {
+                for (Uri uri : inputs) {
+                    String name = displayName(uri, "foto_" + (done + 1));
+                    long size = querySize(uri); before += Math.max(0, size);
+                    Bitmap bitmap;
+                    try (InputStream in = getContentResolver().openInputStream(uri)) { bitmap = BitmapFactory.decodeStream(in); }
+                    if (bitmap == null) throw new IOException("Imagen ilegible");
+                    String outputName = baseName(name) + "." + toolsOutputFormat.toLowerCase(java.util.Locale.ROOT);
+                    Uri out = createToolsOutput(outputName, "image/" + toolsOutputFormat.toLowerCase(java.util.Locale.ROOT));
+                    try (OutputStream stream = openOutput(out)) {
+                        Bitmap.CompressFormat fmt = "PNG".equals(toolsOutputFormat) ? Bitmap.CompressFormat.PNG
+                                : "WEBP".equals(toolsOutputFormat) ? Bitmap.CompressFormat.WEBP : Bitmap.CompressFormat.JPEG;
+                        Bitmap exportBitmap = bitmap;
+                        if (fmt == Bitmap.CompressFormat.JPEG && bitmap.hasAlpha()) {
+                            exportBitmap = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), Bitmap.Config.ARGB_8888);
+                            android.graphics.Canvas canvas = new android.graphics.Canvas(exportBitmap);
+                            canvas.drawColor(Color.WHITE);
+                            canvas.drawBitmap(bitmap, 0, 0, null);
+                        }
+                        if (!exportBitmap.compress(fmt, toolsPhotoQuality, stream)) throw new IOException("No se pudo guardar");
+                        if (exportBitmap != bitmap) exportBitmap.recycle();
+                    }
+                    after += querySize(out); bitmap.recycle(); done++;
+                    final int progress = done;
+                    runOnUiThread(() -> Toast.makeText(this, "Convertidas " + progress + " de " + inputs.size(), Toast.LENGTH_SHORT).show());
+                }
+                addToolsRecent("Conversión de fotos", toolsOutputFormat, before, after);
+                final long totalBefore = before;
+                final long totalAfter = after;
+                final String totalFormat = toolsOutputFormat;
+                runOnUiThread(() -> showToolsResult("Fotos convertidas", totalBefore, totalAfter, totalFormat, null));
+            } catch (Exception e) { runOnUiThread(() -> showToolsError("No se pudieron convertir las fotos: " + e.getMessage())); }
+        }).start();
+    }
+
+    private void showToolsZipCompressor(boolean animated) {
+        LinearLayout page = toolsSubPage("Compresor de archivos");
+        page.addView(toolSelectionSummary("archivos elegidos", toolsSelectedUris.size(), "Agregar más"), margin(0, 14, 0, 14));
+        page.addView(toolSectionLabel("NIVEL DE COMPRESIÓN"), margin(2, 0, 2, 6));
+        LinearLayout levels = new LinearLayout(this);
+        for (String level : new String[]{"Rápido", "Normal", "Máximo"}) levels.addView(toolChip(level, "Normal".equals(level)), new LinearLayout.LayoutParams(0, dp(48), 1f));
+        page.addView(levels, margin(0, 0, 0, 14));
+        EditText name = new EditText(this); name.setSingleLine(true); name.setText("Archivos_" + new java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.ROOT).format(new java.util.Date()) + ".zip");
+        name.setTextColor(Color.WHITE); name.setHintTextColor(Color.GRAY); name.setBackground(roundRect(Color.rgb(18, 19, 26), 16, borderColor())); name.setPadding(dp(14), 0, dp(14), 0);
+        page.addView(name, new LinearLayout.LayoutParams(-1, dp(52)));
+        TextView format = toolChip("Formato ZIP", false); format.setTextColor(Color.rgb(56, 225, 255)); page.addView(format, margin(0, 12, 0, 16));
+        Button compress = primaryButton("Comprimir " + toolsSelectedUris.size() + " archivos"); compress.setOnClickListener(v -> compressSelectedFiles(name.getText().toString()));
+        page.addView(compress, new LinearLayout.LayoutParams(-1, dp(56))); showPage(page, animated);
+    }
+
+    private void showToolsVideoConverter(boolean animated) {
+        LinearLayout page = toolsSubPage("Convertidor de video");
+        page.addView(toolSelectionSummary("video elegido", toolsSelectedUris.size(), "Cambiar"), margin(0, 14, 0, 14));
+        page.addView(toolSectionLabel("VIDEO"), margin(2, 0, 2, 6));
+        LinearLayout video = new LinearLayout(this);
+        for (String format : new String[]{"MP4", "MKV", "WEBM", "AVI", "MOV"}) { TextView chip = toolChip(format, format.equals(toolsVideoFormat)); chip.setOnClickListener(v -> { toolsVideoFormat = format; showToolsVideoConverter(false); }); video.addView(chip, new LinearLayout.LayoutParams(0, dp(42), 1f)); }
+        page.addView(video, margin(0, 0, 0, 12)); page.addView(toolSectionLabel("SOLO AUDIO"), margin(2, 0, 2, 6));
+        LinearLayout audio = new LinearLayout(this);
+        for (String format : new String[]{"MP3", "M4A", "WAV", "OGG"}) { TextView chip = toolChip(format, format.equals(toolsAudioFormat)); chip.setOnClickListener(v -> { toolsAudioFormat = format; showToolsVideoConverter(false); }); audio.addView(chip, new LinearLayout.LayoutParams(0, dp(42), 1f)); }
+        page.addView(audio, margin(0, 0, 0, 14)); page.addView(bodyText("La conversión se ejecuta en el teléfono y guarda una copia nueva."), margin(0, 8, 0, 16));
+        Button convert = primaryButton("Convertir video"); convert.setOnClickListener(v -> convertSelectedVideo(false)); page.addView(convert, new LinearLayout.LayoutParams(-1, dp(56)));
+        Button audioConvert = secondaryButton("Extraer audio " + toolsAudioFormat); audioConvert.setOnClickListener(v -> convertSelectedVideo(true)); page.addView(audioConvert, margin(0, 10, 0, 0)); showPage(page, animated);
+    }
+
+    private void compressSelectedFiles(String requestedName) {
+        if (toolsSelectedUris.isEmpty()) return;
+        new Thread(() -> { long before = 0; Uri output = null;
+            try {
+                String fileName = requestedName == null || requestedName.trim().isEmpty() ? "Archivos.zip" : requestedName.trim(); if (!fileName.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")) fileName += ".zip";
+                output = createToolsOutput(fileName, "application/zip");
+                try (OutputStream raw = openOutput(output); java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(raw)) {
+                    java.util.HashSet<String> names = new java.util.HashSet<>(); byte[] buffer = new byte[64 * 1024];
+                    for (Uri uri : new ArrayList<>(toolsSelectedUris)) { String name = displayName(uri, "archivo"); String unique = name; int n = 1; while (!names.add(unique)) unique = baseName(name) + " (" + (n++) + ")" + extension(name); zip.putNextEntry(new java.util.zip.ZipEntry(unique)); before += Math.max(0, querySize(uri)); try (InputStream in = getContentResolver().openInputStream(uri)) { if (in == null) throw new IOException("No se pudo leer " + name); int count; while ((count = in.read(buffer)) >= 0) if (count > 0) zip.write(buffer, 0, count); } zip.closeEntry(); }
+                }
+                long after = querySize(output); addToolsRecent(fileName, "ZIP", before, after); final Uri result = output; final long b = before, a = after; runOnUiThread(() -> showToolsResult("Compresión lista", b, a, "ZIP", result));
+            } catch (Exception e) { if (output != null) deleteToolsOutput(output); runOnUiThread(() -> showToolsError("No se pudo crear el ZIP: " + e.getMessage())); }
+        }).start();
+    }
+
+    private void convertSelectedVideo(boolean audioOnly) {
+        if (toolsSelectedUris.isEmpty()) return;
+        new Thread(() -> { File input = null; Uri output = null;
+            try {
+                input = copyUriToCache(toolsSelectedUris.get(0), "tools_input"); String format = audioOnly ? toolsAudioFormat.toLowerCase(java.util.Locale.ROOT) : toolsVideoFormat.toLowerCase(java.util.Locale.ROOT); String outputName = baseName(displayName(toolsSelectedUris.get(0), "video")) + "." + format;
+                output = createToolsOutput(outputName, audioOnly ? "audio/" + format : "video/" + format); File temp = new File(getCacheDir(), "tools_output_" + System.nanoTime() + "." + format);
+                String command = audioOnly ? "-y -i " + shellQuote(input.getAbsolutePath()) + " -vn " + audioCodec(format) + " " + shellQuote(temp.getAbsolutePath()) : "-y -i " + shellQuote(input.getAbsolutePath()) + " -c:v libx264 -c:a aac " + shellQuote(temp.getAbsolutePath());
+                File source = input; File destination = temp; Uri result = output; String resultName = outputName;
+                FFmpegKit.executeAsync(command, session -> { if (ReturnCode.isSuccess(session.getReturnCode())) { try (InputStream in = new FileInputStream(destination); OutputStream out = openOutput(result)) { byte[] b = new byte[65536]; int n; while ((n = in.read(b)) >= 0) if (n > 0) out.write(b, 0, n); long before = source.length(), after = destination.length(); addToolsRecent(resultName, format.toUpperCase(java.util.Locale.ROOT), before, after); runOnUiThread(() -> showToolsResult("Conversión lista", before, after, format.toUpperCase(java.util.Locale.ROOT), result)); } catch (Exception e) { runOnUiThread(() -> showToolsError("No se pudo guardar el resultado: " + e.getMessage())); } } else { deleteToolsOutput(result); runOnUiThread(() -> showToolsError("El formato no pudo convertirse en este dispositivo.")); } destination.delete(); source.delete(); });
+            } catch (Exception e) { if (output != null) deleteToolsOutput(output); if (input != null) input.delete(); runOnUiThread(() -> showToolsError("No se pudo iniciar la conversión: " + e.getMessage())); }
+        }).start();
+    }
+
+    private String audioCodec(String format) { return "mp3".equals(format) ? "-codec:a libmp3lame" : "-vn"; }
+    private String shellQuote(String value) { return "'" + value.replace("'", "'\\''") + "'"; }
+    private void showToolsResult(String title, long before, long after, String format, Uri output) { LinearLayout page = toolsSubPage("Listo"); ImageView check = new ImageView(this); check.setImageResource(R.drawable.ic_check); check.setColorFilter(Color.rgb(53, 224, 140)); check.setContentDescription("Conversión completada"); LinearLayout.LayoutParams checkParams = new LinearLayout.LayoutParams(dp(72), dp(72)); checkParams.gravity = Gravity.CENTER_HORIZONTAL; page.addView(check, checkParams); TextView heading = text(title, 26, true); heading.setGravity(Gravity.CENTER); page.addView(heading); LinearLayout compare = card(); compare.setOrientation(LinearLayout.VERTICAL); compare.setPadding(dp(14), dp(14), dp(14), dp(14)); compare.addView(bodyText("Antes   " + formatBytes(before)), margin(0, 0, 0, 6)); compare.addView(bodyText("Después   " + formatBytes(after)), margin(0, 0, 0, 8)); compare.addView(toolChip(format, false)); page.addView(compare, margin(0, 18, 0, 14)); Button open = primaryButton("Abrir"); open.setOnClickListener(v -> { if (output != null) openToolsOutput(output); }); page.addView(open, new LinearLayout.LayoutParams(-1, dp(56))); Button share = secondaryButton("Compartir"); share.setOnClickListener(v -> { if (output != null) shareToolsOutput(output); }); page.addView(share, margin(0, 10, 0, 0)); showPage(page, true); }
+    private void showToolsError(String message) { Toast.makeText(this, message, Toast.LENGTH_LONG).show(); }
+    private Uri createToolsOutput(String name, String mime) throws IOException { String safe = name.replaceAll("[^a-zA-Z0-9._-]", "_"); if (Build.VERSION.SDK_INT >= 29) { ContentValues v = new ContentValues(); v.put(MediaStore.Downloads.DISPLAY_NAME, safe); v.put(MediaStore.Downloads.MIME_TYPE, mime); v.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Tod4S3"); Uri uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, v); if (uri == null) throw new IOException("No se pudo crear el archivo"); return uri; } File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Tod4S3"); if (!dir.exists() && !dir.mkdirs()) throw new IOException("No se pudo crear Descargas/Tod4S3"); File file = new File(dir, safe); int n = 1; while (file.exists()) file = new File(dir, baseName(safe) + " (" + (n++) + ")" + extension(safe)); return Uri.fromFile(file); }
+    private OutputStream openOutput(Uri uri) throws IOException { OutputStream out = "file".equals(uri.getScheme()) ? new FileOutputStream(new File(uri.getPath())) : getContentResolver().openOutputStream(uri); if (out == null) throw new IOException("No se pudo abrir la salida"); return out; }
+    private void deleteToolsOutput(Uri uri) { try { if (uri != null) { if ("file".equals(uri.getScheme())) new File(uri.getPath()).delete(); else getContentResolver().delete(uri, null, null); } } catch (Exception ignored) { } }
+    private long querySize(Uri uri) { try { android.database.Cursor c = getContentResolver().query(uri, new String[]{"_size"}, null, null, null); if (c != null) { try { return c.moveToFirst() ? c.getLong(0) : 0; } finally { c.close(); } } } catch (Exception ignored) { } return 0; }
+    private String displayName(Uri uri, String fallback) { try { android.database.Cursor c = getContentResolver().query(uri, new String[]{"_display_name"}, null, null, null); if (c != null) { try { return c.moveToFirst() ? c.getString(0) : fallback; } finally { c.close(); } } } catch (Exception ignored) { } return fallback; }
+    private String baseName(String name) { int p = name.lastIndexOf('.'); return p > 0 ? name.substring(0, p) : name; }
+    private String extension(String name) { int p = name.lastIndexOf('.'); return p > 0 ? name.substring(p) : ""; }
+    private File copyUriToCache(Uri uri, String prefix) throws IOException { File f = new File(getCacheDir(), prefix + "_" + System.nanoTime()); try (InputStream in = getContentResolver().openInputStream(uri); OutputStream out = new FileOutputStream(f)) { if (in == null) throw new IOException("Archivo ilegible"); byte[] b = new byte[65536]; int n; while ((n = in.read(b)) >= 0) if (n > 0) out.write(b, 0, n); } return f; }
+    private void openToolsOutput(Uri uri) { try { Intent i = new Intent(Intent.ACTION_VIEW); i.setDataAndType(uri, getContentResolver().getType(uri)); i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION); startActivity(i); } catch (Exception e) { Toast.makeText(this, "No hay una aplicación compatible para abrir este archivo.", Toast.LENGTH_LONG).show(); } }
+    private void shareToolsOutput(Uri uri) { Intent i = new Intent(Intent.ACTION_SEND); i.setType(getContentResolver().getType(uri)); i.putExtra(Intent.EXTRA_STREAM, uri); i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION); startActivity(Intent.createChooser(i, "Compartir archivo")); }
 
     private void addIconTab(LinearLayout parent, String description, int iconResource,
                             boolean selected, Runnable action, float weight) {
@@ -7122,6 +7469,9 @@ public final class MainActivity extends Activity {
                     String taskId = row.optString("task_id", "");
                     if (isDeliveryHidden(taskId)) continue;
                     String name = row.optString("filename", "archivo");
+                    boolean isAppUpdate = "app_update".equals(row.optString("kind", ""))
+                            || (taskId.startsWith("app-update-")
+                            && name.toLowerCase(java.util.Locale.ROOT).endsWith(".apk"));
                     long size = row.optLong("size", 0);
                     boolean cloudDeletable = row.optBoolean("cloud_deletable", false);
                     boolean todusDeletable = row.optBoolean("todus_deletable", false);
@@ -7140,7 +7490,7 @@ public final class MainActivity extends Activity {
                     LinearLayout fileHeader = new LinearLayout(this);
                     fileHeader.setOrientation(LinearLayout.HORIZONTAL);
                     fileHeader.setGravity(Gravity.CENTER_VERTICAL);
-                    fileHeader.addView(iconBadge(R.drawable.ic_file_card, accentColor(),
+                    fileHeader.addView(iconBadge(isAppUpdate ? R.drawable.ic_upload_arrow : R.drawable.ic_file_card, accentColor(),
                             raisedSurfaceColor()), new LinearLayout.LayoutParams(dp(42), dp(42)));
                     LinearLayout fileInfo = new LinearLayout(this);
                     fileInfo.setOrientation(LinearLayout.VERTICAL);
@@ -7158,7 +7508,7 @@ public final class MainActivity extends Activity {
                     fileHeader.addView(fileInfo, fileInfoLayout);
                     LinearLayout chips = new LinearLayout(this);
                     chips.setGravity(Gravity.CENTER_VERTICAL);
-                    TextView sourceChip = text("ENTREGA DEL BOT", 9, true);
+                    TextView sourceChip = text(isAppUpdate ? "ACTUALIZACIÓN" : "ENTREGA DEL BOT", 9, true);
                     sourceChip.setTextColor(Color.rgb(216, 221, 233));
                     sourceChip.setGravity(Gravity.CENTER);
                     sourceChip.setPadding(dp(8), dp(4), dp(8), dp(4));
@@ -7177,6 +7527,14 @@ public final class MainActivity extends Activity {
                         newChip.setPadding(dp(8), dp(4), dp(8), dp(4));
                         newChip.setBackground(roundRect(Color.argb(24, 255, 59, 87), 14, Color.rgb(255, 59, 87)));
                         chips.addView(newChip, margin(4, 0, 0, 0));
+                    }
+                    if (isAppUpdate) {
+                        TextView updateChip = text("APK OFICIAL", 9, true);
+                        updateChip.setTextColor(Color.rgb(99, 230, 216));
+                        updateChip.setGravity(Gravity.CENTER);
+                        updateChip.setPadding(dp(8), dp(4), dp(8), dp(4));
+                        updateChip.setBackground(roundRect(Color.argb(24, 56, 225, 255), 14, Color.rgb(56, 225, 255)));
+                        chips.addView(updateChip, margin(4, 0, 0, 0));
                     }
                     fileHeader.addView(chips);
                     card.addView(fileHeader);
@@ -7197,7 +7555,8 @@ public final class MainActivity extends Activity {
                     card.addView(progressBar, progressLayout);
                     LinearLayout cloudActions = new LinearLayout(this);
                     cloudActions.setOrientation(LinearLayout.HORIZONTAL);
-                    Button download = primaryButton(partCount > 1 ? "Descargar y unir" : "Descargar");
+                    Button download = primaryButton(isAppUpdate ? "Descargar actualización"
+                            : partCount > 1 ? "Descargar y unir" : "Descargar");
                     download.setTextSize(13);
                     download.setMinHeight(dp(46));
                     download.setPadding(dp(10), dp(5), dp(10), dp(5));

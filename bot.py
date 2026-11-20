@@ -2859,7 +2859,10 @@ def btn(text: str, **kwargs) -> InlineKeyboardButton:
 
 
 def main_keyboard(user_id: int | None = None) -> InlineKeyboardMarkup:
-    rows = [[InlineKeyboardButton("📥 DESCARGAS", callback_data="downloads", style="success")]]
+    rows = [
+        [InlineKeyboardButton("📥 DESCARGAS", callback_data="downloads", style="success")],
+        [InlineKeyboardButton("📲 ENVIARME APK", callback_data="app:send_update", style="success")],
+    ]
 
     app_button = InlineKeyboardButton(
         "📱 VINCULAR APLICACIÓN", callback_data="app:pair", style="success"
@@ -3286,6 +3289,7 @@ def admin_keyboard(user_id: int | None = None) -> InlineKeyboardMarkup:
         [btn("📊 ʀᴇᴘᴏʀᴛᴇꜱ", callback_data="admin:menu:reports"),
          btn("🛡️ ᴍᴏᴅᴇʀᴀᴄɪóɴ", callback_data="admin:menu:moderation")],
         [btn("📢 ᴄᴏᴍᴜɴɪᴄᴀᴄɪóɴ", callback_data="admin:menu:comms")],
+        [btn("📲 ᴇɴᴠɪᴀʀᴍᴇ ᴀᴘᴋ", callback_data="admin:send_apk")],
     ]
     if user_id is not None and is_owner(user_id):
         rows.append([btn("👑 ɢᴇꜱᴛɪᴏɴᴀʀ ᴀᴅᴍɪɴꜱ", callback_data="admin:admins")])
@@ -5390,9 +5394,10 @@ async def read_bounded_http_body(response, max_bytes: int) -> bytes:
     return b"".join(chunks)
 
 
-async def latest_android_release(application) -> dict[str, object]:
+async def latest_android_release(application, *, max_bytes: int = BOT_API_SEND_LIMIT) -> dict[str, object]:
     bot_data = application.bot_data
-    cache_key = "_tod4s3_latest_android_release"
+    max_bytes = max(BOT_API_SEND_LIMIT, int(max_bytes))
+    cache_key = f"_tod4s3_latest_android_release_{max_bytes}"
     cached = bot_data.get(cache_key)
     if cached and time.monotonic() - float(cached.get("cached_at", 0)) < ANDROID_RELEASE_CACHE_SECONDS:
         return cached["release"]
@@ -5425,9 +5430,9 @@ async def latest_android_release(application) -> dict[str, object]:
                 }:
                     raise ValueError("El enlace del APK redirigió fuera de GitHub.")
                 content_length = response.headers.get("Content-Length")
-                if content_length and int(content_length) > BOT_API_SEND_LIMIT:
+                if content_length and int(content_length) > max_bytes:
                     raise ValueError("La APK publicada supera el límite de envío de Telegram.")
-                apk_data = await read_bounded_http_body(response, BOT_API_SEND_LIMIT)
+                apk_data = await read_bounded_http_body(response, max_bytes)
                 if not apk_data:
                     raise ValueError("El archivo APK está vacío o supera el límite de Telegram.")
         actual_sha256 = hashlib.sha256(apk_data).hexdigest()
@@ -5490,6 +5495,55 @@ async def send_latest_app_release(update: Update, context: ContextTypes.DEFAULT_
             disable_web_page_preview=True,
         )
     return group_delivery
+
+
+async def send_latest_app_release_to_configured_todus(user_id: int, application) -> dict:
+    """Entrega la APK publicada al número ToDus propio del usuario y la registra en Entregas."""
+    target_number = get_user_todus_number(user_id)
+    if not re.fullmatch(r"53\d{8}", target_number):
+        raise ValueError("Primero configura tu número ToDus en el bot.")
+    release = await latest_android_release(application, max_bytes=200 * MIB)
+    filename = str(release["filename"])
+    size = len(release["data"])
+    version_code = int(release["version_code"])
+    task_id = f"app-update-{version_code}-{hashlib.sha256(release['data']).hexdigest()[:16]}"
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(prefix="tod4s3-update-", suffix=".apk", delete=False) as handle:
+            handle.write(release["data"])
+            temp_path = Path(handle.name)
+        download_url = await asyncio.to_thread(
+            deliver_part_via_todus,
+            temp_path,
+            filename,
+            size,
+            target_number,
+            user_id,
+            task_id,
+        )
+        record_delivery(
+            user_id,
+            task_id,
+            filename,
+            size,
+            [download_url],
+            storage_backend="todus_native",
+            remote_delete_supported=True,
+            kind="app_update",
+            version_code=version_code,
+            version_name=str(release["version_name"]),
+            sha256=str(release["sha256"]),
+        )
+        return {
+            "filename": filename,
+            "version_name": str(release["version_name"]),
+            "version_code": version_code,
+            "size": size,
+            "target_number": target_number,
+        }
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
 
 
 async def send_app_support_answer(update: Update, context: ContextTypes.DEFAULT_TYPE, answer: str) -> None:
@@ -5873,6 +5927,62 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             )
             return
         await query.answer(sc("Completa primero el paso actual"), show_alert=True)
+        return
+    if query.data == "admin:send_apk":
+        if not is_admin(user.id):
+            await query.answer(sc("Acción solo para administradores"), show_alert=True)
+            return
+        await query.answer(sc("Preparando la APK…"))
+        try:
+            result = await send_latest_app_release_to_configured_todus(
+                user.id, context.application,
+            )
+            await edit_query_message_text(
+                query.message,
+                card("📲 ᴀᴘᴋ ᴇɴᴠɪᴀᴅᴀ", [
+                    f"Versión: v{result['version_name']} ({result['version_code']})",
+                    f"Archivo: {result['filename']}",
+                    f"Tamaño: {_size_label(result['size'], 0)}",
+                    f"Destino ToDus: {result['target_number']}",
+                    "La aplicación la verá en Entregas al actualizar esa sección.",
+                ]),
+                reply_markup=InlineKeyboardMarkup([[btn("⬅️ ᴠᴏʟᴠᴇʀ ᴀʟ ᴘᴀɴᴇʟ", callback_data="admin:back")]]),
+            )
+        except Exception as exc:
+            log.warning("No se pudo enviar la APK desde el panel (%s)", type(exc).__name__)
+            await edit_query_message_text(
+                query.message,
+                card("⚠️ ɴᴏ ꜱᴇ ᴇɴᴠɪó ʟᴀ ᴀᴘᴋ", [str(exc)[:240]]),
+                reply_markup=InlineKeyboardMarkup([[btn("⬅️ ᴠᴏʟᴠᴇʀ ᴀʟ ᴘᴀɴᴇʟ", callback_data="admin:back")]]),
+            )
+        return
+    if query.data == "app:send_update":
+        await query.answer(sc("Preparando la APK…"))
+        try:
+            result = await send_latest_app_release_to_configured_todus(
+                user.id, context.application,
+            )
+            await edit_query_message_text(
+                query.message,
+                card("📲 ᴀᴘᴋ ᴇɴᴠɪᴀᴅᴀ ᴀ ᴛᴜ ᴛᴏᴅᴜꜱ", [
+                    f"Versión: v{result['version_name']} ({result['version_code']})",
+                    f"Archivo: {result['filename']}",
+                    f"Tamaño: {_size_label(result['size'], 0)}",
+                    "Abre Tod4S3 Sync y actualiza Entregas para verla.",
+                ]),
+                reply_markup=main_keyboard(user.id),
+            )
+        except Exception as exc:
+            log.warning("No se pudo enviar la APK al usuario %s (%s)", user.id, type(exc).__name__)
+            configured = get_user_todus_number(user.id)
+            markup = (InlineKeyboardMarkup([[btn("📱 ᴄᴏɴꜰɪɢᴜʀᴀʀ ᴛᴏᴅᴜꜱ", callback_data="todus:register")],
+                                             [btn("🏠 ɪɴɪᴄɪᴏ", callback_data="home")]])
+                      if not configured else main_keyboard(user.id))
+            await edit_query_message_text(
+                query.message,
+                card("⚠️ ɴᴏ ꜱᴇ ᴇɴᴠɪó ʟᴀ ᴀᴘᴋ", [str(exc)[:240]]),
+                reply_markup=markup,
+            )
         return
     if query.data == "app:pair":
         await query.answer()

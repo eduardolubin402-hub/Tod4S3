@@ -2,6 +2,12 @@ plugins {
     id("com.android.application")
 }
 
+dependencies {
+    implementation("androidx.activity:activity:1.10.1")
+    implementation("androidx.work:work-runtime:2.10.1")
+    implementation("dev.ffmpegkit-maintained:ffmpeg-kit-full:6.0.3")
+}
+
 android {
     namespace = "com.tod4s3.sync"
     compileSdk = 35
@@ -12,9 +18,9 @@ android {
 
     defaultConfig {
         applicationId = "com.tod4s3.sync"
-        minSdk = 23
+        minSdk = 24
         targetSdk = 35
-        versionCode = 125
-        versionName = "1.5.80"
+        versionCode = 126
+        versionName = "1.5.81"
     }
 }

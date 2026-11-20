@@ -71,6 +71,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.activity.result.PickVisualMediaRequest;
 import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia;
+import androidx.core.content.FileProvider;
 import androidx.work.WorkManager;
 import com.arthenica.ffmpegkit.FFmpegKit;
 import com.arthenica.ffmpegkit.ReturnCode;
@@ -354,6 +355,7 @@ public final class MainActivity extends ComponentActivity {
     private ActivityResultLauncher<PickVisualMediaRequest> toolsVideoPicker;
     private ActivityResultLauncher<String[]> toolsDocumentPicker;
     private final ArrayList<Uri> toolsSelectedUris = new ArrayList<>();
+    private Dialog toolsProgressDialog;
     private String toolsMode = "";
     private int toolsPhotoQuality = 85;
     private String toolsOutputFormat = "JPG";
@@ -2559,8 +2561,8 @@ public final class MainActivity extends ComponentActivity {
         page.addView(subtitle, margin(2, 4, 2, 12));
         page.addView(toolHomeCard("Compresor de archivos", "Reduce el peso de varios archivos en ZIP",
                 R.drawable.ic_folder_zip, new String[]{"ZIP", "3 niveles"}, () -> openToolsDocuments()), margin(0, 0, 0, 10));
-        page.addView(toolHomeCard("Convertidor de video", "Video y audio a otro formato",
-                R.drawable.ic_movie, new String[]{"MP4", "MKV", "WEBM", "MP3"}, () -> openToolsVideo()), margin(0, 0, 0, 10));
+        page.addView(toolHomeCard("Convertidor de video", "Convierte videos a MPEG, AVI o MP4",
+                R.drawable.ic_movie, new String[]{"MPEG", "AVI", "MP4"}, () -> openToolsVideo()), margin(0, 0, 0, 10));
         page.addView(toolHomeCard("Convertidor de fotos", "Cambia el formato de tus imágenes",
                 R.drawable.ic_image, new String[]{"JPG", "PNG", "WEBP"}, () -> openToolsPhotos()), margin(0, 0, 0, 14));
         JSONArray recent = toolsRecent();
@@ -2789,13 +2791,10 @@ public final class MainActivity extends ComponentActivity {
         page.addView(toolSelectionSummary("video elegido", toolsSelectedUris.size(), "Cambiar"), margin(0, 14, 0, 14));
         page.addView(toolSectionLabel("VIDEO"), margin(2, 0, 2, 6));
         LinearLayout video = new LinearLayout(this);
-        for (String format : new String[]{"MP4", "MKV", "WEBM", "AVI", "MOV"}) { TextView chip = toolChip(format, format.equals(toolsVideoFormat)); chip.setOnClickListener(v -> { toolsVideoFormat = format; showToolsVideoConverter(false); }); video.addView(chip, new LinearLayout.LayoutParams(0, dp(42), 1f)); }
-        page.addView(video, margin(0, 0, 0, 12)); page.addView(toolSectionLabel("SOLO AUDIO"), margin(2, 0, 2, 6));
-        LinearLayout audio = new LinearLayout(this);
-        for (String format : new String[]{"MP3", "M4A", "WAV", "OGG"}) { TextView chip = toolChip(format, format.equals(toolsAudioFormat)); chip.setOnClickListener(v -> { toolsAudioFormat = format; showToolsVideoConverter(false); }); audio.addView(chip, new LinearLayout.LayoutParams(0, dp(42), 1f)); }
-        page.addView(audio, margin(0, 0, 0, 14)); page.addView(bodyText("La conversión se ejecuta en el teléfono y guarda una copia nueva."), margin(0, 8, 0, 16));
+        for (String format : new String[]{"MPEG", "AVI", "MP4"}) { TextView chip = toolChip(format, format.equals(toolsVideoFormat)); chip.setOnClickListener(v -> { toolsVideoFormat = format; showToolsVideoConverter(false); }); video.addView(chip, new LinearLayout.LayoutParams(0, dp(42), 1f)); }
+        page.addView(video, margin(0, 0, 0, 14)); page.addView(bodyText("La conversión se ejecuta en el teléfono y guarda una copia nueva."), margin(0, 8, 0, 16));
         Button convert = primaryButton("Convertir video"); convert.setOnClickListener(v -> convertSelectedVideo(false)); page.addView(convert, new LinearLayout.LayoutParams(-1, dp(56)));
-        Button audioConvert = secondaryButton("Extraer audio " + toolsAudioFormat); audioConvert.setOnClickListener(v -> convertSelectedVideo(true)); page.addView(audioConvert, margin(0, 10, 0, 0)); showPage(page, animated);
+        showPage(page, animated);
     }
 
     private void compressSelectedFiles(String requestedName) {
@@ -2814,16 +2813,52 @@ public final class MainActivity extends ComponentActivity {
     }
 
     private void convertSelectedVideo(boolean audioOnly) {
-        if (toolsSelectedUris.isEmpty()) return;
+        if (toolsSelectedUris.isEmpty()) {
+            Toast.makeText(this, "Primero selecciona un video.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        showToolsProgress(audioOnly ? "Extrayendo audio…" : "Convirtiendo video…");
         new Thread(() -> { File input = null; Uri output = null;
             try {
                 input = copyUriToCache(toolsSelectedUris.get(0), "tools_input"); String format = audioOnly ? toolsAudioFormat.toLowerCase(java.util.Locale.ROOT) : toolsVideoFormat.toLowerCase(java.util.Locale.ROOT); String outputName = baseName(displayName(toolsSelectedUris.get(0), "video")) + "." + format;
                 output = createToolsOutput(outputName, audioOnly ? "audio/" + format : "video/" + format); File temp = new File(getCacheDir(), "tools_output_" + System.nanoTime() + "." + format);
                 String command = audioOnly ? "-y -i " + shellQuote(input.getAbsolutePath()) + " -vn " + audioCodec(format) + " " + shellQuote(temp.getAbsolutePath()) : "-y -i " + shellQuote(input.getAbsolutePath()) + " -c:v libx264 -c:a aac " + shellQuote(temp.getAbsolutePath());
                 File source = input; File destination = temp; Uri result = output; String resultName = outputName;
-                FFmpegKit.executeAsync(command, session -> { if (ReturnCode.isSuccess(session.getReturnCode())) { try (InputStream in = new FileInputStream(destination); OutputStream out = openOutput(result)) { byte[] b = new byte[65536]; int n; while ((n = in.read(b)) >= 0) if (n > 0) out.write(b, 0, n); long before = source.length(), after = destination.length(); addToolsRecent(resultName, format.toUpperCase(java.util.Locale.ROOT), before, after); runOnUiThread(() -> showToolsResult("Conversión lista", before, after, format.toUpperCase(java.util.Locale.ROOT), result)); } catch (Exception e) { runOnUiThread(() -> showToolsError("No se pudo guardar el resultado: " + e.getMessage())); } } else { deleteToolsOutput(result); runOnUiThread(() -> showToolsError("El formato no pudo convertirse en este dispositivo.")); } destination.delete(); source.delete(); });
-            } catch (Exception e) { if (output != null) deleteToolsOutput(output); if (input != null) input.delete(); runOnUiThread(() -> showToolsError("No se pudo iniciar la conversión: " + e.getMessage())); }
+                FFmpegKit.executeAsync(command, session -> { if (ReturnCode.isSuccess(session.getReturnCode())) { try (InputStream in = new FileInputStream(destination); OutputStream out = openOutput(result)) { byte[] b = new byte[65536]; int n; while ((n = in.read(b)) >= 0) if (n > 0) out.write(b, 0, n); long before = source.length(), after = destination.length(); addToolsRecent(resultName, format.toUpperCase(java.util.Locale.ROOT), before, after); runOnUiThread(() -> { hideToolsProgress(); showToolsResult("Conversión lista", before, after, format.toUpperCase(java.util.Locale.ROOT), result); }); } catch (Exception e) { runOnUiThread(() -> { hideToolsProgress(); showToolsError("No se pudo guardar el resultado: " + e.getMessage()); }); } } else { deleteToolsOutput(result); runOnUiThread(() -> { hideToolsProgress(); showToolsError("El formato no pudo convertirse en este dispositivo."); }); } destination.delete(); source.delete(); });
+            } catch (Exception e) { if (output != null) deleteToolsOutput(output); if (input != null) input.delete(); runOnUiThread(() -> { hideToolsProgress(); showToolsError("No se pudo iniciar la conversión: " + e.getMessage()); }); }
         }).start();
+    }
+    private void showToolsProgress(String message) {
+        hideToolsProgress();
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(24), dp(22), dp(24), dp(22));
+        content.setBackground(roundRect(Color.rgb(24, 26, 36), 22, borderColor()));
+        TextView title = text(message, 18, true);
+        title.setGravity(Gravity.CENTER);
+        content.addView(title);
+        ProgressBar progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        progress.setIndeterminate(true);
+        progress.setProgressTintList(ColorStateList.valueOf(accentColor()));
+        content.addView(progress, margin(0, 18, 0, 8));
+        TextView detail = bodyText("No cierres la aplicación mientras se procesa el archivo.");
+        detail.setGravity(Gravity.CENTER);
+        content.addView(detail);
+        toolsProgressDialog = new Dialog(this);
+        toolsProgressDialog.setContentView(content);
+        toolsProgressDialog.setCancelable(false);
+        toolsProgressDialog.show();
+        Window window = toolsProgressDialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            window.setLayout((int) (getResources().getDisplayMetrics().widthPixels * 0.86f), WindowManager.LayoutParams.WRAP_CONTENT);
+        }
+    }
+    private void hideToolsProgress() {
+        if (toolsProgressDialog != null) {
+            toolsProgressDialog.dismiss();
+            toolsProgressDialog = null;
+        }
     }
 
     private String audioCodec(String format) { return "mp3".equals(format) ? "-codec:a libmp3lame" : "-vn"; }
@@ -2838,8 +2873,42 @@ public final class MainActivity extends ComponentActivity {
     private String baseName(String name) { int p = name.lastIndexOf('.'); return p > 0 ? name.substring(0, p) : name; }
     private String extension(String name) { int p = name.lastIndexOf('.'); return p > 0 ? name.substring(p) : ""; }
     private File copyUriToCache(Uri uri, String prefix) throws IOException { File f = new File(getCacheDir(), prefix + "_" + System.nanoTime()); try (InputStream in = getContentResolver().openInputStream(uri); OutputStream out = new FileOutputStream(f)) { if (in == null) throw new IOException("Archivo ilegible"); byte[] b = new byte[65536]; int n; while ((n = in.read(b)) >= 0) if (n > 0) out.write(b, 0, n); } return f; }
-    private void openToolsOutput(Uri uri) { try { Intent i = new Intent(Intent.ACTION_VIEW); i.setDataAndType(uri, getContentResolver().getType(uri)); i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION); startActivity(i); } catch (Exception e) { Toast.makeText(this, "No hay una aplicación compatible para abrir este archivo.", Toast.LENGTH_LONG).show(); } }
-    private void shareToolsOutput(Uri uri) { Intent i = new Intent(Intent.ACTION_SEND); i.setType(getContentResolver().getType(uri)); i.putExtra(Intent.EXTRA_STREAM, uri); i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION); startActivity(Intent.createChooser(i, "Compartir archivo")); }
+    private Uri shareableToolsUri(Uri uri) {
+        if (uri == null) return null;
+        if (!"file".equalsIgnoreCase(uri.getScheme())) return uri;
+        return FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", new File(uri.getPath()));
+    }
+    private String toolsMimeType(Uri uri) {
+        String mime = uri == null ? null : getContentResolver().getType(uri);
+        if (mime != null && !mime.trim().isEmpty()) return mime;
+        String name = uri == null ? "" : displayName(uri, uri.getLastPathSegment() == null ? "archivo" : uri.getLastPathSegment());
+        String extension = extension(name).toLowerCase(java.util.Locale.ROOT);
+        String guessed = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension.startsWith(".") ? extension.substring(1) : extension);
+        return guessed == null ? "application/octet-stream" : guessed;
+    }
+    private void openToolsOutput(Uri uri) {
+        try {
+            Uri safeUri = shareableToolsUri(uri);
+            Intent intent = new Intent(Intent.ACTION_VIEW).setDataAndType(safeUri, toolsMimeType(uri));
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            intent.setClipData(ClipData.newRawUri("archivo", safeUri));
+            startActivity(intent);
+        } catch (Exception e) {
+            Toast.makeText(this, "No hay una aplicación compatible para abrir este archivo.", Toast.LENGTH_LONG).show();
+        }
+    }
+    private void shareToolsOutput(Uri uri) {
+        try {
+            Uri safeUri = shareableToolsUri(uri);
+            Intent intent = new Intent(Intent.ACTION_SEND).setType(toolsMimeType(uri));
+            intent.putExtra(Intent.EXTRA_STREAM, safeUri);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            intent.setClipData(ClipData.newRawUri("archivo", safeUri));
+            startActivity(Intent.createChooser(intent, "Compartir archivo"));
+        } catch (Exception e) {
+            Toast.makeText(this, "No se pudo preparar el archivo para compartir.", Toast.LENGTH_LONG).show();
+        }
+    }
 
     private void addIconTab(LinearLayout parent, String description, int iconResource,
                             boolean selected, Runnable action, float weight) {

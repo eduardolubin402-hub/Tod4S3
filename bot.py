@@ -5361,13 +5361,16 @@ def validate_android_update_manifest(manifest: object) -> dict[str, object]:
         raise ValueError("Código de versión no válido.")
     apk_url = str(manifest.get("apk_url", "")).strip()
     parsed = urlsplit(apk_url)
-    expected_filename = f"Tod4S3-Sync-v{version_name}.apk"
+    expected_filenames = {
+        f"Tod4S3-Sync-v{version_name}.apk",
+        f"Tod4S3-Sync-v{version_name}-signed.apk",
+    }
     if (
         parsed.scheme != "https"
         or parsed.hostname != "raw.githubusercontent.com"
         or parsed.username or parsed.password
         or not parsed.path.startswith("/eduardolubin402-hub/Tod4S3/main/")
-        or Path(parsed.path).name != expected_filename
+        or Path(parsed.path).name not in expected_filenames
         or parsed.query or parsed.fragment
     ):
         raise ValueError("La URL del APK no corresponde al repositorio oficial.")
@@ -5378,7 +5381,7 @@ def validate_android_update_manifest(manifest: object) -> dict[str, object]:
         "version_name": version_name,
         "version_code": version_code,
         "apk_url": apk_url,
-        "filename": expected_filename,
+        "filename": Path(parsed.path).name,
         "sha256": sha256,
     }
 

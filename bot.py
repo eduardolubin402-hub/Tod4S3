@@ -5572,9 +5572,8 @@ async def handle_app_support_keywords(update: Update, context: ContextTypes.DEFA
     chat = update.effective_chat
     if not message or not user or not chat or getattr(user, "is_bot", False):
         return
-    is_group = is_app_support_group(chat)
-    is_private = getattr(chat, "type", None) == "private"
-    if not is_group and not is_private:
+    is_group = getattr(chat, "type", None) in {"group", "supergroup"}
+    if not is_group:
         return
 
     intent = classify_app_support_intent(message.text or "")

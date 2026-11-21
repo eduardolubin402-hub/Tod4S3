@@ -5,7 +5,6 @@ plugins {
 dependencies {
     implementation("androidx.activity:activity:1.10.1")
     implementation("androidx.work:work-runtime:2.10.1")
-    implementation("dev.ffmpegkit-maintained:ffmpeg-kit-full:6.0.3")
 }
 
 android {
@@ -20,7 +19,7 @@ android {
         applicationId = "com.tod4s3.sync"
         minSdk = 24
         targetSdk = 35
-        versionCode = 127
-        versionName = "1.5.82"
+        versionCode = 128
+        versionName = "1.5.83"
     }
 }

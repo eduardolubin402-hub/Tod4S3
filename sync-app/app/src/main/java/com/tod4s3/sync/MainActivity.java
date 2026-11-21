@@ -73,8 +73,6 @@ import androidx.activity.result.PickVisualMediaRequest;
 import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia;
 import androidx.core.content.FileProvider;
 import androidx.work.WorkManager;
-import com.arthenica.ffmpegkit.FFmpegKit;
-import com.arthenica.ffmpegkit.ReturnCode;
 import android.graphics.Color;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -351,32 +349,16 @@ public final class MainActivity extends ComponentActivity {
     private android.graphics.Bitmap telegramProfileBitmap;
     private boolean telegramProfilePhotoLoading;
     private final ArrayList<ImageView> pendingProfileAvatarViews = new ArrayList<>();
-    private ActivityResultLauncher<PickVisualMediaRequest> toolsPhotoPicker;
-    private ActivityResultLauncher<PickVisualMediaRequest> toolsVideoPicker;
     private ActivityResultLauncher<String[]> toolsDocumentPicker;
     private final ArrayList<Uri> toolsSelectedUris = new ArrayList<>();
     private Dialog toolsProgressDialog;
+    private ProgressBar toolsProgressBar;
+    private TextView toolsProgressLabel;
     private String toolsMode = "";
-    private int toolsPhotoQuality = 85;
-    private String toolsOutputFormat = "JPG";
-    private String toolsVideoFormat = "MP4";
-    private String toolsAudioFormat = "MP3";
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         prefs = getSharedPreferences("tod4s3_sync", MODE_PRIVATE);
-        toolsPhotoPicker = registerForActivityResult(new ActivityResultContracts.PickMultipleVisualMedia(20), uris -> {
-            if (uris == null || uris.isEmpty()) return;
-            toolsSelectedUris.clear();
-            toolsSelectedUris.addAll(uris);
-            showToolsPhotoConverter(true);
-        });
-        toolsVideoPicker = registerForActivityResult(new PickVisualMedia(), uri -> {
-            if (uri == null) return;
-            toolsSelectedUris.clear();
-            toolsSelectedUris.add(uri);
-            showToolsVideoConverter(true);
-        });
         toolsDocumentPicker = registerForActivityResult(new ActivityResultContracts.OpenMultipleDocuments(), uris -> {
             if (uris == null || uris.isEmpty()) return;
             toolsSelectedUris.clear();
@@ -2559,12 +2541,8 @@ public final class MainActivity extends ComponentActivity {
         TextView subtitle = bodyText("Procesa tus archivos en el teléfono, sin internet.");
         subtitle.setTextSize(13);
         page.addView(subtitle, margin(2, 4, 2, 12));
-        page.addView(toolHomeCard("Compresor de archivos", "Reduce el peso de varios archivos en ZIP",
-                R.drawable.ic_folder_zip, new String[]{"ZIP", "3 niveles"}, () -> openToolsDocuments()), margin(0, 0, 0, 10));
-        page.addView(toolHomeCard("Convertidor de video", "Convierte videos a MPEG, AVI o MP4",
-                R.drawable.ic_movie, new String[]{"MPEG", "AVI", "MP4"}, () -> openToolsVideo()), margin(0, 0, 0, 10));
-        page.addView(toolHomeCard("Convertidor de fotos", "Cambia el formato de tus imágenes",
-                R.drawable.ic_image, new String[]{"JPG", "PNG", "WEBP"}, () -> openToolsPhotos()), margin(0, 0, 0, 14));
+        page.addView(toolHomeCard("Compresor de archivos", "Comprime videos, imágenes y documentos en ZIP",
+                R.drawable.ic_folder_zip, new String[]{"VIDEO", "IMAGEN", "ARCHIVO"}, () -> openToolsDocuments()), margin(0, 0, 0, 14));
         JSONArray recent = toolsRecent();
         if (recent.length() > 0) {
             page.addView(toolSectionLabel("RECIENTES"), margin(2, 4, 2, 6));
@@ -2656,64 +2634,19 @@ public final class MainActivity extends ComponentActivity {
         } catch (Exception ignored) { }
     }
 
-    private void openToolsPhotos() {
-        toolsMode = "photos";
-        toolsPhotoPicker.launch(new PickVisualMediaRequest.Builder()
-                .setMediaType(PickVisualMedia.ImageOnly.INSTANCE).build());
-    }
-
-    private void openToolsVideo() {
-        toolsMode = "video";
-        toolsVideoPicker.launch(new PickVisualMediaRequest.Builder()
-                .setMediaType(PickVisualMedia.VideoOnly.INSTANCE).build());
-    }
-
     private void openToolsDocuments() {
         toolsMode = "zip";
         toolsDocumentPicker.launch(new String[]{"*/*"});
-    }
-
-    private void showToolsPhotoConverter(boolean animated) {
-        LinearLayout page = toolsSubPage("Convertidor de fotos");
-        page.addView(toolSelectionSummary("Fotos elegidas", toolsSelectedUris.size(), "Editar"), margin(0, 14, 0, 14));
-        page.addView(toolSectionLabel("CONVERTIR A"), margin(2, 0, 2, 6));
-        LinearLayout formats = new LinearLayout(this);
-        for (String format : new String[]{"JPG", "PNG", "WEBP"}) {
-            TextView choice = toolChip(format, format.equals(toolsOutputFormat));
-            choice.setTextSize(14);
-            choice.setMinHeight(dp(58));
-            choice.setOnClickListener(v -> { toolsOutputFormat = format; showToolsPhotoConverter(false); });
-            formats.addView(choice, new LinearLayout.LayoutParams(0, dp(58), 1f));
-            if (!format.equals("WEBP")) ((LinearLayout.LayoutParams) choice.getLayoutParams()).setMargins(0, 0, dp(8), 0);
-        }
-        page.addView(formats, margin(0, 0, 0, 14));
-        page.addView(toolSectionLabel("CALIDAD"), margin(2, 0, 2, 4));
-        SeekBar quality = new SeekBar(this);
-        quality.setMax(100); quality.setProgress(toolsPhotoQuality);
-        quality.setEnabled(!"PNG".equals(toolsOutputFormat));
-        quality.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            public void onProgressChanged(SeekBar bar, int value, boolean fromUser) { toolsPhotoQuality = Math.max(1, value); }
-            public void onStartTrackingTouch(SeekBar bar) { }
-            public void onStopTrackingTouch(SeekBar bar) { }
-        });
-        page.addView(quality, margin(0, 0, 0, 4));
-        TextView qualityValue = bodyText("Menos peso                                      Mejor calidad");
-        qualityValue.setTextSize(11); page.addView(qualityValue);
-        TextView summary = bodyText(toolsSelectedUris.size() + " fotos → " + toolsOutputFormat
-                + "\nLas originales no se modifican.");
-        page.addView(summary, margin(0, 16, 0, 12));
-        Button convert = primaryButton("Convertir " + toolsSelectedUris.size() + " fotos");
-        convert.setOnClickListener(v -> convertSelectedPhotos());
-        page.addView(convert, new LinearLayout.LayoutParams(-1, dp(56)));
-        showPage(page, animated);
     }
 
     private LinearLayout toolsSubPage(String title) {
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setPadding(dp(14), dp(12), dp(14), dp(120));
-        LinearLayout head = new LinearLayout(this); head.setGravity(Gravity.CENTER_VERTICAL);
-        Button back = secondaryButton(""); setButtonIcon(back, R.drawable.ic_arrow_back, Color.WHITE);
+        LinearLayout head = new LinearLayout(this);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        Button back = secondaryButton("");
+        setButtonIcon(back, R.drawable.ic_arrow_back, Color.WHITE);
         back.setOnClickListener(v -> showToolsStep(true));
         head.addView(back, new LinearLayout.LayoutParams(dp(44), dp(44)));
         head.addView(text(title, 19, true), margin(12, 0, 0, 0));
@@ -2730,50 +2663,33 @@ public final class MainActivity extends ComponentActivity {
         Button edit = secondaryButton(action); edit.setTextSize(11); box.addView(edit, new LinearLayout.LayoutParams(-2, dp(40)));
         return box;
     }
-
-    private void convertSelectedPhotos() {
-        if (toolsSelectedUris.isEmpty()) return;
-        final ArrayList<Uri> inputs = new ArrayList<>(toolsSelectedUris);
-        new Thread(() -> {
-            int done = 0; long before = 0, after = 0;
-            try {
-                for (Uri uri : inputs) {
-                    String name = displayName(uri, "foto_" + (done + 1));
-                    long size = querySize(uri); before += Math.max(0, size);
-                    Bitmap bitmap;
-                    try (InputStream in = getContentResolver().openInputStream(uri)) { bitmap = BitmapFactory.decodeStream(in); }
-                    if (bitmap == null) throw new IOException("Imagen ilegible");
-                    String outputName = baseName(name) + "." + toolsOutputFormat.toLowerCase(java.util.Locale.ROOT);
-                    Uri out = createToolsOutput(outputName, "image/" + toolsOutputFormat.toLowerCase(java.util.Locale.ROOT));
-                    try (OutputStream stream = openOutput(out)) {
-                        Bitmap.CompressFormat fmt = "PNG".equals(toolsOutputFormat) ? Bitmap.CompressFormat.PNG
-                                : "WEBP".equals(toolsOutputFormat) ? Bitmap.CompressFormat.WEBP : Bitmap.CompressFormat.JPEG;
-                        Bitmap exportBitmap = bitmap;
-                        if (fmt == Bitmap.CompressFormat.JPEG && bitmap.hasAlpha()) {
-                            exportBitmap = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), Bitmap.Config.ARGB_8888);
-                            android.graphics.Canvas canvas = new android.graphics.Canvas(exportBitmap);
-                            canvas.drawColor(Color.WHITE);
-                            canvas.drawBitmap(bitmap, 0, 0, null);
-                        }
-                        if (!exportBitmap.compress(fmt, toolsPhotoQuality, stream)) throw new IOException("No se pudo guardar");
-                        if (exportBitmap != bitmap) exportBitmap.recycle();
-                    }
-                    after += querySize(out); bitmap.recycle(); done++;
-                    final int progress = done;
-                    runOnUiThread(() -> Toast.makeText(this, "Convertidas " + progress + " de " + inputs.size(), Toast.LENGTH_SHORT).show());
-                }
-                addToolsRecent("Conversión de fotos", toolsOutputFormat, before, after);
-                final long totalBefore = before;
-                final long totalAfter = after;
-                final String totalFormat = toolsOutputFormat;
-                runOnUiThread(() -> showToolsResult("Fotos convertidas", totalBefore, totalAfter, totalFormat, null));
-            } catch (Exception e) { runOnUiThread(() -> showToolsError("No se pudieron convertir las fotos: " + e.getMessage())); }
-        }).start();
+    private String toolsFileType(Uri uri) {
+        String mime = toolsMimeType(uri).toLowerCase(java.util.Locale.ROOT);
+        if (mime.startsWith("video/")) return "VIDEO";
+        if (mime.startsWith("image/")) return "IMAGEN";
+        if (mime.startsWith("audio/")) return "AUDIO";
+        return "DOCUMENTO";
     }
-
+    private TextView toolsSelectionDetails() {
+        StringBuilder details = new StringBuilder("Archivos que se comprimirán:\n");
+        int limit = Math.min(5, toolsSelectedUris.size());
+        for (int i = 0; i < limit; i++) {
+            Uri uri = toolsSelectedUris.get(i);
+            details.append("• ").append(displayName(uri, "Archivo " + (i + 1)))
+                    .append(" · ").append(toolsFileType(uri)).append("\n");
+        }
+        if (toolsSelectedUris.size() > limit) details.append("• +").append(toolsSelectedUris.size() - limit).append(" archivos más");
+        TextView detailsView = bodyText(details.toString().trim());
+        detailsView.setTextSize(12);
+        detailsView.setPadding(dp(12), dp(10), dp(12), dp(10));
+        detailsView.setBackground(roundRect(Color.rgb(24, 26, 36), 14, borderColor()));
+        return detailsView;
+    }
     private void showToolsZipCompressor(boolean animated) {
         LinearLayout page = toolsSubPage("Compresor de archivos");
         page.addView(toolSelectionSummary("archivos elegidos", toolsSelectedUris.size(), "Agregar más"), margin(0, 14, 0, 14));
+        page.addView(toolsSelectionDetails(), margin(0, 0, 0, 14));
+        page.addView(bodyText("Los archivos originales permanecen normales en Descargas. El ZIP se crea como una copia aparte."), margin(0, 0, 0, 14));
         page.addView(toolSectionLabel("NIVEL DE COMPRESIÓN"), margin(2, 0, 2, 6));
         LinearLayout levels = new LinearLayout(this);
         for (String level : new String[]{"Rápido", "Normal", "Máximo"}) levels.addView(toolChip(level, "Normal".equals(level)), new LinearLayout.LayoutParams(0, dp(48), 1f));
@@ -2786,48 +2702,48 @@ public final class MainActivity extends ComponentActivity {
         page.addView(compress, new LinearLayout.LayoutParams(-1, dp(56))); showPage(page, animated);
     }
 
-    private void showToolsVideoConverter(boolean animated) {
-        LinearLayout page = toolsSubPage("Convertidor de video");
-        page.addView(toolSelectionSummary("video elegido", toolsSelectedUris.size(), "Cambiar"), margin(0, 14, 0, 14));
-        page.addView(toolSectionLabel("VIDEO"), margin(2, 0, 2, 6));
-        LinearLayout video = new LinearLayout(this);
-        for (String format : new String[]{"MPEG", "AVI", "MP4"}) { TextView chip = toolChip(format, format.equals(toolsVideoFormat)); chip.setOnClickListener(v -> { toolsVideoFormat = format; showToolsVideoConverter(false); }); video.addView(chip, new LinearLayout.LayoutParams(0, dp(42), 1f)); }
-        page.addView(video, margin(0, 0, 0, 14)); page.addView(bodyText("La conversión se ejecuta en el teléfono y guarda una copia nueva."), margin(0, 8, 0, 16));
-        Button convert = primaryButton("Convertir video"); convert.setOnClickListener(v -> convertSelectedVideo(false)); page.addView(convert, new LinearLayout.LayoutParams(-1, dp(56)));
-        showPage(page, animated);
-    }
-
     private void compressSelectedFiles(String requestedName) {
-        if (toolsSelectedUris.isEmpty()) return;
-        new Thread(() -> { long before = 0; Uri output = null;
+        if (toolsSelectedUris.isEmpty()) {
+            Toast.makeText(this, "Primero selecciona al menos un archivo.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        showToolsProgress("Comprimiendo archivos…");
+        new Thread(() -> { long before = 0; long processed = 0; Uri output = null;
             try {
-                String fileName = requestedName == null || requestedName.trim().isEmpty() ? "Archivos.zip" : requestedName.trim(); if (!fileName.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")) fileName += ".zip";
+                ArrayList<Uri> inputs = new ArrayList<>(toolsSelectedUris);
+                for (Uri uri : inputs) before += Math.max(0, querySize(uri));
+                String fileName = requestedName == null || requestedName.trim().isEmpty() ? "Archivos.zip" : requestedName.trim();
+                if (!fileName.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")) fileName += ".zip";
                 output = createToolsOutput(fileName, "application/zip");
                 try (OutputStream raw = openOutput(output); java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(raw)) {
                     java.util.HashSet<String> names = new java.util.HashSet<>(); byte[] buffer = new byte[64 * 1024];
-                    for (Uri uri : new ArrayList<>(toolsSelectedUris)) { String name = displayName(uri, "archivo"); String unique = name; int n = 1; while (!names.add(unique)) unique = baseName(name) + " (" + (n++) + ")" + extension(name); zip.putNextEntry(new java.util.zip.ZipEntry(unique)); before += Math.max(0, querySize(uri)); try (InputStream in = getContentResolver().openInputStream(uri)) { if (in == null) throw new IOException("No se pudo leer " + name); int count; while ((count = in.read(buffer)) >= 0) if (count > 0) zip.write(buffer, 0, count); } zip.closeEntry(); }
+                    for (Uri uri : inputs) {
+                        String name = displayName(uri, "archivo"); String unique = name; int n = 1;
+                        while (!names.add(unique)) unique = baseName(name) + " (" + (n++) + ")" + extension(name);
+                        zip.putNextEntry(new java.util.zip.ZipEntry(unique));
+                        try (InputStream in = getContentResolver().openInputStream(uri)) {
+                            if (in == null) throw new IOException("No se pudo leer " + name);
+                            int count;
+                            while ((count = in.read(buffer)) >= 0) if (count > 0) {
+                                zip.write(buffer, 0, count);
+                                processed += count;
+                                final int percent = before > 0 ? Math.min(99, (int) ((processed * 100L) / before)) : 0;
+                                runOnUiThread(() -> updateToolsProgress(percent));
+                            }
+                        }
+                        zip.closeEntry();
+                    }
                 }
-                long after = querySize(output); addToolsRecent(fileName, "ZIP", before, after); final Uri result = output; final long b = before, a = after; runOnUiThread(() -> showToolsResult("Compresión lista", b, a, "ZIP", result));
-            } catch (Exception e) { if (output != null) deleteToolsOutput(output); runOnUiThread(() -> showToolsError("No se pudo crear el ZIP: " + e.getMessage())); }
+                long after = querySize(output); addToolsRecent(fileName, "ZIP", before, after);
+                final Uri result = output; final long b = before, a = after;
+                runOnUiThread(() -> { updateToolsProgress(100); hideToolsProgress(); showToolsResult("Compresión lista", b, a, "ZIP", result); });
+            } catch (Exception e) {
+                if (output != null) deleteToolsOutput(output);
+                runOnUiThread(() -> { hideToolsProgress(); showToolsError("No se pudo crear el ZIP: " + e.getMessage()); });
+            }
         }).start();
     }
 
-    private void convertSelectedVideo(boolean audioOnly) {
-        if (toolsSelectedUris.isEmpty()) {
-            Toast.makeText(this, "Primero selecciona un video.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        showToolsProgress(audioOnly ? "Extrayendo audio…" : "Convirtiendo video…");
-        new Thread(() -> { File input = null; Uri output = null;
-            try {
-                input = copyUriToCache(toolsSelectedUris.get(0), "tools_input"); String format = audioOnly ? toolsAudioFormat.toLowerCase(java.util.Locale.ROOT) : toolsVideoFormat.toLowerCase(java.util.Locale.ROOT); String outputName = baseName(displayName(toolsSelectedUris.get(0), "video")) + "." + format;
-                output = createToolsOutput(outputName, audioOnly ? "audio/" + format : "video/" + format); File temp = new File(getCacheDir(), "tools_output_" + System.nanoTime() + "." + format);
-                String command = audioOnly ? "-y -i " + shellQuote(input.getAbsolutePath()) + " -vn " + audioCodec(format) + " " + shellQuote(temp.getAbsolutePath()) : "-y -i " + shellQuote(input.getAbsolutePath()) + " -c:v libx264 -c:a aac " + shellQuote(temp.getAbsolutePath());
-                File source = input; File destination = temp; Uri result = output; String resultName = outputName;
-                FFmpegKit.executeAsync(command, session -> { if (ReturnCode.isSuccess(session.getReturnCode())) { try (InputStream in = new FileInputStream(destination); OutputStream out = openOutput(result)) { byte[] b = new byte[65536]; int n; while ((n = in.read(b)) >= 0) if (n > 0) out.write(b, 0, n); long before = source.length(), after = destination.length(); addToolsRecent(resultName, format.toUpperCase(java.util.Locale.ROOT), before, after); runOnUiThread(() -> { hideToolsProgress(); showToolsResult("Conversión lista", before, after, format.toUpperCase(java.util.Locale.ROOT), result); }); } catch (Exception e) { runOnUiThread(() -> { hideToolsProgress(); showToolsError("No se pudo guardar el resultado: " + e.getMessage()); }); } } else { deleteToolsOutput(result); runOnUiThread(() -> { hideToolsProgress(); showToolsError("El formato no pudo convertirse en este dispositivo."); }); } destination.delete(); source.delete(); });
-            } catch (Exception e) { if (output != null) deleteToolsOutput(output); if (input != null) input.delete(); runOnUiThread(() -> { hideToolsProgress(); showToolsError("No se pudo iniciar la conversión: " + e.getMessage()); }); }
-        }).start();
-    }
     private void showToolsProgress(String message) {
         hideToolsProgress();
         LinearLayout content = new LinearLayout(this);
@@ -2837,11 +2753,15 @@ public final class MainActivity extends ComponentActivity {
         TextView title = text(message, 18, true);
         title.setGravity(Gravity.CENTER);
         content.addView(title);
-        ProgressBar progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        progress.setIndeterminate(true);
-        progress.setProgressTintList(ColorStateList.valueOf(accentColor()));
-        content.addView(progress, margin(0, 18, 0, 8));
-        TextView detail = bodyText("No cierres la aplicación mientras se procesa el archivo.");
+        toolsProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        toolsProgressBar.setMax(100);
+        toolsProgressBar.setProgress(0);
+        toolsProgressBar.setProgressTintList(ColorStateList.valueOf(accentColor()));
+        content.addView(toolsProgressBar, margin(0, 18, 0, 8));
+        toolsProgressLabel = text("0 %", 16, true);
+        toolsProgressLabel.setGravity(Gravity.CENTER);
+        content.addView(toolsProgressLabel, margin(0, 0, 0, 6));
+        TextView detail = bodyText("Los archivos originales no se borran ni se mueven.");
         detail.setGravity(Gravity.CENTER);
         content.addView(detail);
         toolsProgressDialog = new Dialog(this);
@@ -2859,33 +2779,15 @@ public final class MainActivity extends ComponentActivity {
             toolsProgressDialog.dismiss();
             toolsProgressDialog = null;
         }
+        toolsProgressBar = null;
+        toolsProgressLabel = null;
+    }
+    private void updateToolsProgress(int percent) {
+        int safePercent = Math.max(0, Math.min(100, percent));
+        if (toolsProgressBar != null) toolsProgressBar.setProgress(safePercent);
+        if (toolsProgressLabel != null) toolsProgressLabel.setText(safePercent + " %");
     }
 
-    private String audioCodec(String format) { return "mp3".equals(format) ? "-codec:a libmp3lame" : "-vn"; }
-    private String shellQuote(String value) { return "'" + value.replace("'", "'\\''") + "'"; }
-    private void showToolsResult(String title, long before, long after, String format, Uri output) { LinearLayout page = toolsSubPage("Listo"); ImageView check = new ImageView(this); check.setImageResource(R.drawable.ic_check); check.setColorFilter(Color.rgb(53, 224, 140)); check.setContentDescription("Conversión completada"); LinearLayout.LayoutParams checkParams = new LinearLayout.LayoutParams(dp(72), dp(72)); checkParams.gravity = Gravity.CENTER_HORIZONTAL; page.addView(check, checkParams); TextView heading = text(title, 26, true); heading.setGravity(Gravity.CENTER); page.addView(heading); LinearLayout compare = card(); compare.setOrientation(LinearLayout.VERTICAL); compare.setPadding(dp(14), dp(14), dp(14), dp(14)); compare.addView(bodyText("Antes   " + formatBytes(before)), margin(0, 0, 0, 6)); compare.addView(bodyText("Después   " + formatBytes(after)), margin(0, 0, 0, 8)); compare.addView(toolChip(format, false)); page.addView(compare, margin(0, 18, 0, 14)); Button open = primaryButton("Abrir"); open.setOnClickListener(v -> { if (output != null) openToolsOutput(output); }); page.addView(open, new LinearLayout.LayoutParams(-1, dp(56))); Button share = secondaryButton("Compartir"); share.setOnClickListener(v -> { if (output != null) shareToolsOutput(output); }); page.addView(share, margin(0, 10, 0, 0)); showPage(page, true); }
-    private void showToolsError(String message) { Toast.makeText(this, message, Toast.LENGTH_LONG).show(); }
-    private Uri createToolsOutput(String name, String mime) throws IOException { String safe = name.replaceAll("[^a-zA-Z0-9._-]", "_"); if (Build.VERSION.SDK_INT >= 29) { ContentValues v = new ContentValues(); v.put(MediaStore.Downloads.DISPLAY_NAME, safe); v.put(MediaStore.Downloads.MIME_TYPE, mime); v.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Tod4S3"); Uri uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, v); if (uri == null) throw new IOException("No se pudo crear el archivo"); return uri; } File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Tod4S3"); if (!dir.exists() && !dir.mkdirs()) throw new IOException("No se pudo crear Descargas/Tod4S3"); File file = new File(dir, safe); int n = 1; while (file.exists()) file = new File(dir, baseName(safe) + " (" + (n++) + ")" + extension(safe)); return Uri.fromFile(file); }
-    private OutputStream openOutput(Uri uri) throws IOException { OutputStream out = "file".equals(uri.getScheme()) ? new FileOutputStream(new File(uri.getPath())) : getContentResolver().openOutputStream(uri); if (out == null) throw new IOException("No se pudo abrir la salida"); return out; }
-    private void deleteToolsOutput(Uri uri) { try { if (uri != null) { if ("file".equals(uri.getScheme())) new File(uri.getPath()).delete(); else getContentResolver().delete(uri, null, null); } } catch (Exception ignored) { } }
-    private long querySize(Uri uri) { try { android.database.Cursor c = getContentResolver().query(uri, new String[]{"_size"}, null, null, null); if (c != null) { try { return c.moveToFirst() ? c.getLong(0) : 0; } finally { c.close(); } } } catch (Exception ignored) { } return 0; }
-    private String displayName(Uri uri, String fallback) { try { android.database.Cursor c = getContentResolver().query(uri, new String[]{"_display_name"}, null, null, null); if (c != null) { try { return c.moveToFirst() ? c.getString(0) : fallback; } finally { c.close(); } } } catch (Exception ignored) { } return fallback; }
-    private String baseName(String name) { int p = name.lastIndexOf('.'); return p > 0 ? name.substring(0, p) : name; }
-    private String extension(String name) { int p = name.lastIndexOf('.'); return p > 0 ? name.substring(p) : ""; }
-    private File copyUriToCache(Uri uri, String prefix) throws IOException { File f = new File(getCacheDir(), prefix + "_" + System.nanoTime()); try (InputStream in = getContentResolver().openInputStream(uri); OutputStream out = new FileOutputStream(f)) { if (in == null) throw new IOException("Archivo ilegible"); byte[] b = new byte[65536]; int n; while ((n = in.read(b)) >= 0) if (n > 0) out.write(b, 0, n); } return f; }
-    private Uri shareableToolsUri(Uri uri) {
-        if (uri == null) return null;
-        if (!"file".equalsIgnoreCase(uri.getScheme())) return uri;
-        return FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", new File(uri.getPath()));
-    }
-    private String toolsMimeType(Uri uri) {
-        String mime = uri == null ? null : getContentResolver().getType(uri);
-        if (mime != null && !mime.trim().isEmpty()) return mime;
-        String name = uri == null ? "" : displayName(uri, uri.getLastPathSegment() == null ? "archivo" : uri.getLastPathSegment());
-        String extension = extension(name).toLowerCase(java.util.Locale.ROOT);
-        String guessed = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension.startsWith(".") ? extension.substring(1) : extension);
-        return guessed == null ? "application/octet-stream" : guessed;
-    }
     private void openToolsOutput(Uri uri) {
         try {
             Uri safeUri = shareableToolsUri(uri);
@@ -2908,6 +2810,59 @@ public final class MainActivity extends ComponentActivity {
         } catch (Exception e) {
             Toast.makeText(this, "No se pudo preparar el archivo para compartir.", Toast.LENGTH_LONG).show();
         }
+    }
+
+    private void showToolsResult(String title, long before, long after, String format, Uri output) {
+        LinearLayout page = toolsSubPage("Listo");
+        ImageView check = new ImageView(this);
+        check.setImageResource(R.drawable.ic_check);
+        check.setColorFilter(Color.rgb(53, 224, 140));
+        LinearLayout.LayoutParams checkParams = new LinearLayout.LayoutParams(dp(72), dp(72));
+        checkParams.gravity = Gravity.CENTER_HORIZONTAL;
+        page.addView(check, checkParams);
+        TextView heading = text(title, 26, true); heading.setGravity(Gravity.CENTER); page.addView(heading);
+        LinearLayout compare = card(); compare.setOrientation(LinearLayout.VERTICAL); compare.setPadding(dp(14), dp(14), dp(14), dp(14));
+        compare.addView(bodyText("Antes   " + formatBytes(before)), margin(0, 0, 0, 6));
+        compare.addView(bodyText("Después   " + formatBytes(after)), margin(0, 0, 0, 8));
+        compare.addView(toolChip(format, false)); page.addView(compare, margin(0, 18, 0, 14));
+        Button open = primaryButton("Abrir"); open.setOnClickListener(v -> { if (output != null) openToolsOutput(output); });
+        page.addView(open, new LinearLayout.LayoutParams(-1, dp(56)));
+        Button share = secondaryButton("Compartir"); share.setOnClickListener(v -> { if (output != null) shareToolsOutput(output); });
+        page.addView(share, margin(0, 10, 0, 0)); showPage(page, true);
+    }
+
+    private void showToolsError(String message) { Toast.makeText(this, message, Toast.LENGTH_LONG).show(); }
+
+    private Uri createToolsOutput(String name, String mime) throws IOException {
+        String safe = name.replaceAll("[^a-zA-Z0-9._-]", "_");
+        if (Build.VERSION.SDK_INT >= 29) {
+            ContentValues values = new ContentValues(); values.put(MediaStore.Downloads.DISPLAY_NAME, safe);
+            values.put(MediaStore.Downloads.MIME_TYPE, mime); values.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Tod4S3");
+            Uri uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+            if (uri == null) throw new IOException("No se pudo crear el archivo"); return uri;
+        }
+        File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Tod4S3");
+        if (!dir.exists() && !dir.mkdirs()) throw new IOException("No se pudo crear Descargas/Tod4S3");
+        File file = new File(dir, safe); int n = 1;
+        while (file.exists()) file = new File(dir, baseName(safe) + " (" + (n++) + ")" + extension(safe));
+        return Uri.fromFile(file);
+    }
+
+    private OutputStream openOutput(Uri uri) throws IOException {
+        OutputStream out = "file".equalsIgnoreCase(uri.getScheme()) ? new FileOutputStream(new File(uri.getPath())) : getContentResolver().openOutputStream(uri);
+        if (out == null) throw new IOException("No se pudo abrir la salida"); return out;
+    }
+    private void deleteToolsOutput(Uri uri) { try { if (uri != null) { if ("file".equalsIgnoreCase(uri.getScheme())) new File(uri.getPath()).delete(); else getContentResolver().delete(uri, null, null); } } catch (Exception ignored) { } }
+    private long querySize(Uri uri) { try (android.database.Cursor c = getContentResolver().query(uri, new String[]{"_size"}, null, null, null)) { return c != null && c.moveToFirst() ? c.getLong(0) : 0; } catch (Exception ignored) { return 0; } }
+    private String displayName(Uri uri, String fallback) { try (android.database.Cursor c = getContentResolver().query(uri, new String[]{"_display_name"}, null, null, null)) { return c != null && c.moveToFirst() ? c.getString(0) : fallback; } catch (Exception ignored) { return fallback; } }
+    private String baseName(String name) { int p = name.lastIndexOf('.'); return p > 0 ? name.substring(0, p) : name; }
+    private String extension(String name) { int p = name.lastIndexOf('.'); return p > 0 ? name.substring(p) : ""; }
+    private Uri shareableToolsUri(Uri uri) { if (uri == null || !"file".equalsIgnoreCase(uri.getScheme())) return uri; return FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", new File(uri.getPath())); }
+    private String toolsMimeType(Uri uri) {
+        String mime = uri == null ? null : getContentResolver().getType(uri); if (mime != null && !mime.trim().isEmpty()) return mime;
+        String name = uri == null ? "archivo" : displayName(uri, uri.getLastPathSegment() == null ? "archivo" : uri.getLastPathSegment());
+        String ext = extension(name).toLowerCase(java.util.Locale.ROOT); String guessed = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext.startsWith(".") ? ext.substring(1) : ext);
+        return guessed == null ? "application/octet-stream" : guessed;
     }
 
     private void addIconTab(LinearLayout parent, String description, int iconResource,

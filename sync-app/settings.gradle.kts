@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Tod4S3Sync"
 include(":app")
+include(":ai-app")

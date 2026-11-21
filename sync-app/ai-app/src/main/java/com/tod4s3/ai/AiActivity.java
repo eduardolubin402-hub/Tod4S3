@@ -18,7 +18,9 @@ import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Switch;
@@ -48,7 +50,6 @@ public final class AiActivity extends Activity {
     private static final int BG = Color.rgb(12, 13, 19);
     private static final int PANEL = Color.rgb(25, 27, 36);
     private static final int RED = Color.rgb(255, 59, 87);
-    private static final int CYAN = Color.rgb(52, 217, 232);
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private final ArrayList<JSONObject> history = new ArrayList<>();
     private SharedPreferences prefs;
@@ -56,11 +57,13 @@ public final class AiActivity extends Activity {
     private String username = "";
     private LinearLayout root;
     private LinearLayout transcript;
+    private LinearLayout welcomePanel;
     private ScrollView scroll;
     private EditText userField;
     private EditText passwordField;
     private EditText composer;
     private TextView status;
+    private TextView chatStatus;
     private Button loginButton;
     private ImageButton sendButton;
     private Switch speakSwitch;
@@ -93,7 +96,7 @@ public final class AiActivity extends Activity {
         LinearLayout content = column();
         content.setGravity(Gravity.CENTER_VERTICAL);
         content.setPadding(dp(26), dp(34), dp(26), dp(34));
-        TextView mark = label("✦", 40, true, CYAN);
+        TextView mark = label("✦", 40, true, RED);
         mark.setGravity(Gravity.CENTER);
         content.addView(mark, lp(-1, dp(62)));
         TextView title = label("AiTod4S3", 31, true, Color.WHITE);
@@ -152,21 +155,29 @@ public final class AiActivity extends Activity {
 
     private void showChat() {
         root = base();
+        welcomePanel = null;
         LinearLayout page = column();
         page.setPadding(dp(14), dp(12), dp(14), dp(10));
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title = label("✦  AiTod4S3", 21, true, Color.WHITE);
-        title.setTextColor(CYAN);
-        header.addView(title, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        FrameLayout orb = createAiOrb(dp(34));
+        LinearLayout.LayoutParams orbParams = lp(34, 34);
+        orbParams.setMargins(0, 0, dp(10), 0);
+        header.addView(orb, orbParams);
+        LinearLayout identity = column();
+        identity.addView(label("AiTod4S3", 19, true, Color.WHITE), lp(-1, -2));
+        chatStatus = label("en línea", 12, true, Color.rgb(53, 224, 140));
+        identity.addView(chatStatus, lp(-1, -2));
+        header.addView(identity, new LinearLayout.LayoutParams(0, -2, 1f));
         Button logout = button("SALIR", PANEL);
         logout.setTextSize(11);
+        logout.setBackground(roundStroke(PANEL, 14, Color.rgb(78, 82, 98)));
         logout.setOnClickListener(v -> logout());
-        header.addView(logout, lp(dp(75), dp(40)));
-        page.addView(header, lp(-1, dp(48)));
+        header.addView(logout, lp(74, 40));
+        page.addView(header, lp(-1, 48));
         View line = new View(this);
         line.setBackgroundColor(Color.rgb(52, 55, 68));
-        page.addView(line, lp(-1, dp(1)));
+        page.addView(line, lp(-1, 1));
         scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setVerticalScrollBarEnabled(false);
@@ -174,12 +185,12 @@ public final class AiActivity extends Activity {
         transcript.setPadding(dp(2), dp(12), dp(2), dp(14));
         scroll.addView(transcript, new ScrollView.LayoutParams(-1, -2));
         page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
-        if (history.isEmpty()) addBubble("¡Hola! Soy AiTod4S3. ¿En qué puedo ayudarte?", false);
+        if (history.isEmpty()) addWelcomeState();
         else for (JSONObject item : history) addBubble(item.optString("content", ""), "user".equals(item.optString("role")));
         LinearLayout voiceRow = new LinearLayout(this);
         voiceRow.setGravity(Gravity.CENTER_VERTICAL);
         speakSwitch = new Switch(this);
-        speakSwitch.setText("La IA responde por voz");
+        speakSwitch.setText("La IA me habla");
         speakSwitch.setTextColor(Color.rgb(190, 194, 207));
         speakSwitch.setTextSize(13);
         speakSwitch.setChecked(prefs.getBoolean("speak_enabled", false));
@@ -189,23 +200,42 @@ public final class AiActivity extends Activity {
         });
         voiceRow.addView(speakSwitch, new LinearLayout.LayoutParams(0, dp(42), 1f));
         TextView microphoneHint = label("Micrófono para dictar", 11, false, Color.rgb(134, 141, 160));
-        voiceRow.addView(microphoneHint, lp(-2, dp(42)));
-        page.addView(voiceRow, lp(-1, dp(42)));
+        voiceRow.addView(microphoneHint, lp(-2, 42));
+        page.addView(voiceRow, lp(-1, 42));
+        FrameLayout composerShell = new FrameLayout(this);
+        composerShell.setPadding(dp(7), dp(6), dp(7), dp(6));
+        composerShell.setBackground(roundStroke(Color.rgb(11, 12, 18), 30, RED));
         LinearLayout composerRow = new LinearLayout(this);
         composerRow.setGravity(Gravity.CENTER_VERTICAL);
-        composer = edit("Escribe tu mensaje…", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
-        composer.setMinHeight(dp(48));
-        composer.setMaxLines(4);
+        ImageView sparkle = new ImageView(this);
+        sparkle.setImageResource(R.drawable.ic_ai_sparkle);
+        sparkle.setColorFilter(RED);
+        composerRow.addView(sparkle, lp(22, 22));
+        composer = new EditText(this);
+        composer.setSingleLine(true);
+        composer.setHint("Pregúntale a AiTod4S3…");
+        composer.setTextColor(Color.rgb(244, 245, 249));
+        composer.setHintTextColor(Color.rgb(109, 115, 132));
+        composer.setTextSize(15);
+        composer.setPadding(dp(7), 0, dp(5), 0);
+        composer.setBackgroundColor(Color.TRANSPARENT);
+        composer.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
         composer.setImeOptions(EditorInfo.IME_ACTION_SEND);
-        composerRow.addView(composer, new LinearLayout.LayoutParams(0, -2, 1f));
-        ImageButton mic = iconButton("🎙", CYAN, "Dictar mensaje por voz");
+        composerRow.addView(composer, new LinearLayout.LayoutParams(0, dp(44), 1f));
+        ImageButton mic = iconButton(R.drawable.ic_mic, Color.WHITE, "Dictar mensaje por voz");
+        mic.setBackground(roundStroke(Color.rgb(31, 33, 42), 22, Color.argb(52, 255, 255, 255)));
         mic.setOnClickListener(v -> beginDictation());
-        composerRow.addView(mic, lp(dp(44), dp(46)));
-        sendButton = iconButton("➤", Color.WHITE, "Enviar mensaje a AiTod4S3");
-        sendButton.setBackground(round(RED, 24));
+        composerRow.addView(mic, lp(42, 42));
+        sendButton = iconButton(R.drawable.ic_send, Color.WHITE, "Enviar mensaje a AiTod4S3");
+        sendButton.setBackground(gradientRound(new int[]{RED, Color.rgb(193, 18, 46)}, 24));
         sendButton.setOnClickListener(v -> sendMessage());
-        composerRow.addView(sendButton, lp(dp(46), dp(46)));
-        page.addView(composerRow, lp(-1, -2));
+        composerRow.addView(sendButton, lp(44, 44));
+        composerShell.addView(composerRow, new FrameLayout.LayoutParams(-1, -1));
+        page.addView(composerShell, lp(-1, -2));
+        composer.setOnEditorActionListener((view, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_SEND) { sendMessage(); return true; }
+            return false;
+        });
         root.addView(page, new LinearLayout.LayoutParams(-1, 0, 1f));
     }
 
@@ -214,15 +244,20 @@ public final class AiActivity extends Activity {
         String text = composer.getText().toString().trim();
         if (text.isEmpty()) return;
         composer.setText("");
+        if (welcomePanel != null && welcomePanel.getParent() == transcript) {
+            transcript.removeView(welcomePanel);
+            welcomePanel = null;
+        }
         JSONObject userMessage = new JSONObject();
         try { userMessage.put("role", "user").put("content", text); } catch (JSONException ignored) { return; }
         history.add(userMessage);
         trimHistory();
         saveHistory();
         addBubble(text, true);
-        addBubble("AiTod4S3 está pensando…", false);
+        addThinkingBubble();
         sending = true;
         sendButton.setEnabled(false);
+        if (chatStatus != null) chatStatus.setText("pensando…");
         JSONArray messages = new JSONArray();
         int from = Math.max(0, history.size() - 12);
         for (int i = from; i < history.size(); i++) messages.put(history.get(i));
@@ -244,6 +279,7 @@ public final class AiActivity extends Activity {
                         tts.speak(reply, TextToSpeech.QUEUE_FLUSH, null, "aitod4s3-reply");
                     sending = false;
                     sendButton.setEnabled(true);
+                    if (chatStatus != null) chatStatus.setText("en línea");
                 });
             } catch (Exception e) {
                 String error = friendlyError(e);
@@ -253,6 +289,7 @@ public final class AiActivity extends Activity {
                     Toast.makeText(this, error, Toast.LENGTH_LONG).show();
                     sending = false;
                     sendButton.setEnabled(true);
+                    if (chatStatus != null) chatStatus.setText("en línea");
                     if (unauthorized) logout();
                 });
             }
@@ -368,14 +405,116 @@ public final class AiActivity extends Activity {
     }
     private void trimHistory() { while (history.size() > 40) history.remove(0); }
 
+    private void addWelcomeState() {
+        welcomePanel = column();
+        welcomePanel.setGravity(Gravity.CENTER);
+        welcomePanel.setPadding(dp(8), dp(20), dp(8), dp(20));
+        welcomePanel.setMinimumHeight(Math.max(dp(430), getResources().getDisplayMetrics().heightPixels - dp(350)));
+
+        FrameLayout orb = createAiOrb(dp(96));
+        welcomePanel.addView(orb, lp(96, 96));
+        TextView title = label("Hola, soy AiTod4S3", 26, true, Color.WHITE);
+        title.setGravity(Gravity.CENTER);
+        welcomePanel.addView(title, margins(-1, -2, 0, 16, 0, 4));
+        TextView subtitle = label("Tu asistente inteligente, listo para ayudarte", 14, false, Color.rgb(170, 176, 194));
+        subtitle.setGravity(Gravity.CENTER);
+        welcomePanel.addView(subtitle, margins(-1, -2, 0, 0, 0, 20));
+
+        String[] titles = {"Explícame algo", "Ayúdame a escribir", "Resume un tema", "Dame ideas"};
+        String[] hints = {"Responde con claridad", "Un mensaje o un texto", "Lo esencial, paso a paso", "Empecemos una lluvia de ideas"};
+        String[] prompts = {
+                "Explícame de forma sencilla un tema que te indique.",
+                "Ayúdame a redactar un mensaje claro y natural.",
+                "Ayúdame a resumir un tema en sus ideas principales.",
+                "Dame ideas creativas para un proyecto."
+        };
+        LinearLayout grid = column();
+        for (int rowIndex = 0; rowIndex < 2; rowIndex++) {
+            LinearLayout row = new LinearLayout(this);
+            for (int col = 0; col < 2; col++) {
+                int index = rowIndex * 2 + col;
+                LinearLayout card = column();
+                card.setGravity(Gravity.CENTER_VERTICAL);
+                card.setPadding(dp(13), dp(11), dp(12), dp(11));
+                card.setBackground(roundStroke(Color.rgb(15, 16, 23), 19,
+                        index == 0 ? Color.rgb(255, 59, 87) : Color.argb(38, 255, 255, 255)));
+                ImageView icon = new ImageView(this);
+                icon.setImageResource(R.drawable.ic_ai_sparkle);
+                icon.setColorFilter(index == 0 ? Color.WHITE : RED);
+                icon.setPadding(dp(7), dp(7), dp(7), dp(7));
+                icon.setBackground(gradientRound(new int[]{RED, Color.rgb(193, 18, 46)}, 11));
+                card.addView(icon, lp(32, 32));
+                card.addView(label(titles[index], 14, true, Color.WHITE), margins(-1, -2, 0, 8, 0, 0));
+                TextView hint = label(hints[index], 11, false, Color.rgb(160, 166, 182));
+                card.addView(hint, margins(-1, -2, 0, 3, 0, 0));
+                card.setOnClickListener(v -> sendSuggestedPrompt(prompts[index]));
+                LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(0, dp(106), 1f);
+                if (col > 0) cardParams.setMargins(dp(8), 0, 0, 0);
+                row.addView(card, cardParams);
+            }
+            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, dp(106));
+            if (rowIndex > 0) rowParams.setMargins(0, dp(8), 0, 0);
+            grid.addView(row, rowParams);
+        }
+        welcomePanel.addView(grid, lp(-1, -2));
+        TextView disclaimer = label("Puede equivocarse. Verifica la información importante.", 11, false, Color.rgb(133, 139, 156));
+        disclaimer.setGravity(Gravity.CENTER);
+        welcomePanel.addView(disclaimer, margins(-1, -2, 0, 15, 0, 0));
+        transcript.addView(welcomePanel, new LinearLayout.LayoutParams(-1, -2));
+    }
+
+    private void sendSuggestedPrompt(String prompt) {
+        if (composer == null) return;
+        composer.setText(prompt);
+        sendMessage();
+    }
+
+    private FrameLayout createAiOrb(int size) {
+        FrameLayout orb = new FrameLayout(this);
+        GradientDrawable background = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{RED, Color.rgb(229, 154, 20)});
+        background.setShape(GradientDrawable.OVAL);
+        background.setStroke(dp(1), Color.argb(70, 255, 255, 255));
+        orb.setBackground(background);
+        orb.setElevation(dp(4));
+        ImageView sparkle = new ImageView(this);
+        sparkle.setImageResource(R.drawable.ic_ai_sparkle);
+        sparkle.setColorFilter(Color.argb(230, 255, 255, 255));
+        int glyphSize = Math.max(dp(17), size / 2);
+        orb.addView(sparkle, new FrameLayout.LayoutParams(glyphSize, glyphSize, Gravity.CENTER));
+        return orb;
+    }
+
     private void addBubble(String text, boolean mine) {
-        TextView bubble = label(text, 15, false, Color.rgb(241, 242, 247));
-        bubble.setPadding(dp(14), dp(11), dp(14), dp(11));
-        bubble.setBackground(round(mine ? Color.rgb(105, 32, 48) : PANEL, 18));
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams((int) (getResources().getDisplayMetrics().widthPixels * .82f), -2);
-        params.gravity = mine ? Gravity.RIGHT : Gravity.LEFT;
-        params.setMargins(dp(4), dp(4), dp(4), dp(6));
-        transcript.addView(bubble, params);
+        if (mine) {
+            TextView bubble = label(text, 15, true, Color.WHITE);
+            bubble.setGravity(Gravity.CENTER_VERTICAL);
+            bubble.setPadding(dp(16), dp(10), dp(16), dp(10));
+            bubble.setBackground(gradientRound(new int[]{RED, Color.rgb(193, 18, 46)}, 18));
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams((int) (getResources().getDisplayMetrics().widthPixels * .82f), -2);
+            params.gravity = Gravity.RIGHT;
+            params.setMargins(dp(4), dp(4), dp(4), dp(10));
+            transcript.addView(bubble, params);
+        } else {
+            LinearLayout answer = column();
+            LinearLayout author = new LinearLayout(this);
+            author.setGravity(Gravity.CENTER_VERTICAL);
+            author.addView(createAiOrb(dp(26)), lp(26, 26));
+            author.addView(label("AiTod4S3", 15, true, Color.WHITE), margins(-2, -2, 8, 0, 0, 0));
+            answer.addView(author, lp(-1, -2));
+            TextView body = label(text, 15, false, Color.rgb(233, 235, 243));
+            body.setLineSpacing(dp(5), 1f);
+            answer.addView(body, margins(-1, -2, 0, 8, 0, 0));
+            transcript.addView(answer, margins(-1, -2, 3, 5, 3, 13));
+        }
+        scroll.post(() -> scroll.fullScroll(View.FOCUS_DOWN));
+    }
+
+    private void addThinkingBubble() {
+        TextView bubble = label("AiTod4S3 está pensando…", 14, true, Color.rgb(234, 249, 255));
+        bubble.setPadding(dp(15), dp(13), dp(15), dp(13));
+        bubble.setBackground(roundStroke(Color.rgb(15, 17, 23), 20, Color.argb(90, 56, 225, 255)));
+        transcript.addView(bubble, margins(-1, -2, 4, 2, 4, 8));
         scroll.post(() -> scroll.fullScroll(View.FOCUS_DOWN));
     }
     private void removeThinkingBubble() {
@@ -423,19 +562,35 @@ public final class AiActivity extends Activity {
         v.setTypeface(Typeface.DEFAULT, Typeface.BOLD); v.setBackground(round(color, 14));
         return v;
     }
-    private ImageButton iconButton(String glyph, int color, String description) {
-        ImageButton v = new ImageButton(this); v.setImageDrawable(null); v.setContentDescription(description);
+    private ImageButton iconButton(int iconRes, int color, String description) {
+        ImageButton v = new ImageButton(this);
+        v.setImageResource(iconRes);
+        v.setColorFilter(color);
+        v.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        v.setContentDescription(description);
+        v.setPadding(0, 0, 0, 0);
         v.setBackground(round(PANEL, 22));
-        TextView overlay = label(glyph, 21, true, color); overlay.setGravity(Gravity.CENTER);
-        v.setTag(overlay);
-        // ImageButton has no text; use its background glyph through a ripple-free foreground drawable substitute.
-        v.setBackground(new GlyphDrawable(glyph, color, this));
         return v;
     }
     private GradientDrawable round(int color, int radius) {
         GradientDrawable d = new GradientDrawable(); d.setColor(color); d.setCornerRadius(dp(radius)); return d;
     }
+    private GradientDrawable roundStroke(int color, int radius, int strokeColor) {
+        GradientDrawable d = round(color, radius);
+        d.setStroke(dp(1), strokeColor);
+        return d;
+    }
+    private GradientDrawable gradientRound(int[] colors, int radius) {
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR, colors);
+        d.setCornerRadius(dp(radius));
+        return d;
+    }
     private LinearLayout.LayoutParams lp(int width, int height) { return new LinearLayout.LayoutParams(width < 0 ? width : dp(width), height < 0 ? height : dp(height)); }
+    private LinearLayout.LayoutParams margins(int width, int height, int left, int top, int right, int bottom) {
+        LinearLayout.LayoutParams params = lp(width, height);
+        params.setMargins(dp(left), dp(top), dp(right), dp(bottom));
+        return params;
+    }
     private void space(LinearLayout parent, int height) { parent.addView(new View(this), lp(1, height)); }
     private int dp(int value) { return (int) (value * getResources().getDisplayMetrics().density + .5f); }
 
@@ -445,20 +600,4 @@ public final class AiActivity extends Activity {
         super.onDestroy();
     }
 
-    /** Small drawable so the round composer controls remain legible without extra image dependencies. */
-    private static final class GlyphDrawable extends android.graphics.drawable.Drawable {
-        private final String glyph; private final int color; private final android.graphics.Paint paint = new android.graphics.Paint(3);
-        private final Activity activity;
-        GlyphDrawable(String glyph, int color, Activity activity) { this.glyph = glyph; this.color = color; this.activity = activity; }
-        @Override public void draw(android.graphics.Canvas canvas) {
-            android.graphics.Rect b = getBounds();
-            paint.setColor(glyph.equals("➤") ? RED : PANEL); paint.setStyle(android.graphics.Paint.Style.FILL);
-            canvas.drawRoundRect(b.left, b.top, b.right, b.bottom, activity.getResources().getDisplayMetrics().density * 22, activity.getResources().getDisplayMetrics().density * 22, paint);
-            paint.setColor(color); paint.setTextAlign(android.graphics.Paint.Align.CENTER); paint.setTextSize(activity.getResources().getDisplayMetrics().density * 21); paint.setTypeface(Typeface.DEFAULT_BOLD);
-            canvas.drawText(glyph, b.exactCenterX(), b.exactCenterY() - (paint.ascent() + paint.descent()) / 2, paint);
-        }
-        @Override public void setAlpha(int alpha) { paint.setAlpha(alpha); invalidateSelf(); }
-        @Override public void setColorFilter(android.graphics.ColorFilter filter) { paint.setColorFilter(filter); invalidateSelf(); }
-        @Override public int getOpacity() { return android.graphics.PixelFormat.TRANSLUCENT; }
-    }
 }

@@ -1,0 +1,52 @@
+name: Build standalone AiTod4S3 APK
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - 'ai_auth.py'
+      - 'bot.py'
+      - 'web_store.py'
+      - 'sync-app/settings.gradle.kts'
+      - 'sync-app/ai-app/**'
+      - '.github/workflows/build-aitod4s3.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform and build tools
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Provide the project AAPT2 override
+        run: |
+          sudo mkdir -p /home/ubuntu/android-tools
+          sudo install -m 0755 "$ANDROID_HOME/build-tools/35.0.0/aapt2" /home/ubuntu/android-tools/aapt2
+
+      - name: Build only standalone AiTod4S3
+        working-directory: sync-app
+        run: ./gradlew --no-daemon :ai-app:assembleDebug
+
+      - name: Upload installable debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AiTod4S3-debug-apk
+          path: sync-app/ai-app/build/outputs/apk/debug/ai-app-debug.apk
+          if-no-files-found: error
+          retention-days: 14

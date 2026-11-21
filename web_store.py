@@ -20,6 +20,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 from app_config import public_site_origin
 import sync_api
 import todus_s3_storage
+import ai_auth
 from sync_api import consume_pairing_code, deliveries_for_token, revoke_token
 from todus_s3_storage import delete_from_todus_s3
 
@@ -47,6 +48,10 @@ _NIKUDARIA_CLIENT_ID_RE = re.compile(
 _NIKUDARIA_RECENT_REQUESTS: dict[str, list[float]] = {}
 _NIKUDARIA_DAILY_REQUESTS: dict[str, list[float]] = {}
 _AI_GATEWAY_SEMAPHORE = BoundedSemaphore(2)
+_AI_ACCOUNT_RATE_LOCK = Lock()
+_AI_ACCOUNT_REQUESTS: dict[str, list[float]] = {}
+_AI_ACCOUNT_DAILY_REQUESTS: dict[str, list[float]] = {}
+_AI_LOGIN_ATTEMPTS: dict[str, list[float]] = {}
 
 
 def _compress_app_upload(source: Path, filename: str) -> tuple[Path, str]:
@@ -584,6 +589,94 @@ def _dispatch_app_task(token: str, action: str, payload: dict) -> tuple[dict, in
     return result
 
 
+def _dispatch_ai_account_chat(token: str, body: dict, device_id: str) -> tuple[dict, int]:
+    """AiTod4S3 standalone account chat; intentionally independent of app Premium."""
+    try:
+        username = ai_auth.resolve_session(token, device_id)
+    except RuntimeError:
+        return {"ok": False, "error": "auth_service_unavailable"}, 503
+    if not username:
+        return {"ok": False, "error": "unauthorized"}, 401
+    messages = body.get("messages")
+    if not isinstance(messages, list) or not 1 <= len(messages) <= 12:
+        return {"ok": False, "error": "invalid_messages"}, 400
+    clean: list[dict[str, str]] = []
+    total = 0
+    for item in messages:
+        if not isinstance(item, dict) or item.get("role") not in {"user", "assistant"}:
+            return {"ok": False, "error": "invalid_messages"}, 400
+        content = item.get("content")
+        if not isinstance(content, str) or not content.strip() or len(content) > 4000:
+            return {"ok": False, "error": "invalid_messages"}, 400
+        content = content.strip()
+        total += len(content)
+        if total > 16000:
+            return {"ok": False, "error": "conversation_too_long"}, 413
+        clean.append({"role": item["role"], "content": content})
+    if clean[-1]["role"] != "user":
+        return {"ok": False, "error": "invalid_messages"}, 400
+    now = time.monotonic()
+    with _AI_ACCOUNT_RATE_LOCK:
+        recent = [t for t in _AI_ACCOUNT_REQUESTS.get(username, []) if now-t < 60]
+        daily = [t for t in _AI_ACCOUNT_DAILY_REQUESTS.get(username, []) if now-t < 86_400]
+        try:
+            daily_limit = max(1, min(1000, int(os.getenv("AI_APP_DAILY_LIMIT", "80"))))
+        except ValueError:
+            daily_limit = 80
+        if len(recent) >= 8:
+            return {"ok": False, "error": "ai_rate_limited"}, 429
+        if len(daily) >= daily_limit:
+            return {"ok": False, "error": "ai_daily_limit"}, 429
+        recent.append(now)
+        daily.append(now)
+        _AI_ACCOUNT_REQUESTS[username] = recent
+        _AI_ACCOUNT_DAILY_REQUESTS[username] = daily
+        if len(_AI_ACCOUNT_REQUESTS) > 5000:
+            oldest = next(iter(_AI_ACCOUNT_REQUESTS))
+            if oldest != username:
+                _AI_ACCOUNT_REQUESTS.pop(oldest, None)
+                _AI_ACCOUNT_DAILY_REQUESTS.pop(oldest, None)
+    api_key = os.getenv("IASINCENSURA", "").strip()
+    if not api_key.startswith("sk-notrack-") or len(api_key) < 24 or any(c.isspace() for c in api_key):
+        return {"ok": False, "error": "ai_not_configured"}, 503
+    system = (
+        "Eres AiTod4S3, un asistente general experto, claro y preciso. Responde en el idioma del usuario. "
+        "Sé directo y honesto; no inventes datos. Nunca solicites contraseñas, códigos, PIN, tokens ni datos de pago. "
+        "No afirmes tener acceso al teléfono, cuentas ni información en tiempo real."
+    )
+    request_body = json.dumps({
+        "model": "notrack-uncensored",
+        "messages": [{"role": "system", "content": system}, *clean],
+        "max_tokens": 512, "temperature": 0.7, "stream": False,
+    }, separators=(",", ":")).encode("utf-8")
+    request = urllib.request.Request(
+        "https://api.notrack.ai/v1/chat/completions", data=request_body,
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "Accept": "application/json"},
+        method="POST",
+    )
+    if not _AI_GATEWAY_SEMAPHORE.acquire(blocking=False):
+        return {"ok": False, "error": "ai_busy"}, 429
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            provider_data = json.loads(response.read(1_000_000).decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        error = {401: "ai_provider_auth", 429: "ai_busy", 404: "ai_provider_endpoint",
+                 400: "ai_provider_request", 403: "ai_provider_access", 503: "ai_unavailable"}.get(
+                     exc.code, "ai_provider_error" if exc.code < 500 else "ai_unavailable")
+        return {"ok": False, "error": error}, 429 if exc.code == 429 else 502 if exc.code < 500 else 503
+    except (TimeoutError, urllib.error.URLError, OSError, ValueError, json.JSONDecodeError):
+        return {"ok": False, "error": "ai_unavailable"}, 502
+    finally:
+        _AI_GATEWAY_SEMAPHORE.release()
+    try:
+        answer = provider_data["choices"][0]["message"]["content"]
+        if not isinstance(answer, str) or not answer.strip():
+            raise ValueError("empty_answer")
+    except (KeyError, IndexError, TypeError, ValueError):
+        return {"ok": False, "error": "ai_invalid_response"}, 502
+    return {"ok": True, "reply": answer.strip()}, 200
+
+
 def _authorize_app_token(token: str) -> tuple[dict | None, dict | None, int]:
     """Validate a mobile session and apply both Telegram-ID and device bans."""
     identity = sync_api.app_identity_for_token(token)
@@ -869,6 +962,7 @@ class StoreHandler(SimpleHTTPRequestHandler):
             "/api/app/premium/claim", "/api/app/support", "/api/app/ai/chat",
             "/api/app/nikudaria/agent",
             "/api/app/update-decline", "/api/app/device-status", "/api/app/compress",
+            "/api/ai/login", "/api/ai/logout", "/api/ai/chat",
         }:
             self._json_response({"ok": False, "error": "not_found"}, 404)
             return
@@ -878,7 +972,7 @@ class StoreHandler(SimpleHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length", "0"))
             max_body_length = 65_536 if parsed.path in {
-                "/api/app/ai/chat", "/api/app/nikudaria/agent",
+                "/api/app/ai/chat", "/api/app/nikudaria/agent", "/api/ai/chat",
             } else 8192
             if length < 0 or length > max_body_length:
                 raise ValueError("body_too_large")
@@ -907,8 +1001,55 @@ class StoreHandler(SimpleHTTPRequestHandler):
             else:
                 self._json_response({"ok": True, "token": token})
             return
+        if parsed.path == "/api/ai/login":
+            username, password = body.get("username"), body.get("password")
+            device_id = body.get("device_id")
+            if not isinstance(device_id, str) or not re.fullmatch(r"[a-fA-F0-9]{16}", device_id):
+                self._json_response({"ok": False, "error": "invalid_device"}, 400)
+                return
+            client = self.client_address[0] if self.client_address else "unknown"
+            now = time.monotonic()
+            with _AI_ACCOUNT_RATE_LOCK:
+                attempts = [t for t in _AI_LOGIN_ATTEMPTS.get(client, []) if now-t < 300]
+                if len(attempts) >= 10:
+                    self._json_response({"ok": False, "error": "login_rate_limited"}, 429)
+                    return
+                attempts.append(now)
+                _AI_LOGIN_ATTEMPTS[client] = attempts
+            try:
+                valid = ai_auth.authenticate(username, password)
+                if valid:
+                    if not ai_auth.bind_or_check_device(str(username).strip(), device_id):
+                        self._json_response({"ok": False, "error": "device_in_use"}, 409)
+                        return
+                    token_value, expires = ai_auth.issue_session(str(username).strip(), device_id)
+                else:
+                    token_value, expires = "", 0
+            except (RuntimeError, OSError):
+                self._json_response({"ok": False, "error": "auth_service_unavailable"}, 503)
+                return
+            if not valid:
+                self._json_response({"ok": False, "error": "invalid_credentials"}, 401)
+                return
+            with _AI_ACCOUNT_RATE_LOCK:
+                _AI_LOGIN_ATTEMPTS.pop(client, None)
+            self._json_response({"ok": True, "token": token_value, "expires_at": expires})
+            return
         token = self.headers.get("Authorization", "")
         token = token[7:].strip() if token.lower().startswith("bearer ") else ""
+        if parsed.path == "/api/ai/logout":
+            try:
+                revoked = ai_auth.revoke_session(token)
+            except (RuntimeError, OSError):
+                self._json_response({"ok": False, "error": "auth_service_unavailable"}, 503)
+                return
+            self._json_response({"ok": True, "revoked": revoked})
+            return
+        if parsed.path == "/api/ai/chat":
+            device_id = self.headers.get("X-Ai-Device-Id", "")
+            payload, status = _dispatch_ai_account_chat(token, body, device_id)
+            self._json_response(payload, status)
+            return
         if parsed.path in {"/api/app/update-decline", "/api/app/device-status"}:
             device_id = body.get("device_id")
             identity, auth_error, auth_status = _authorize_optional_device(self, device_id)

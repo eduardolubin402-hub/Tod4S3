@@ -82,6 +82,7 @@ from premium_tools import (
 )
 from app_config import ANDROID_UPDATE_MANIFEST_URL, public_site_url
 import sync_api
+import ai_auth
 
 load_dotenv()
 
@@ -413,6 +414,8 @@ TODUS_USERS_FILE = os.getenv("TODUS_USERS_FILE", str(DATA_DIR / "todus_users.jso
 TODUS_AUTH_FILE = os.getenv("TODUS_AUTH_FILE", str(DATA_DIR / "todus_auth.json"))
 TODUS_SENT_MESSAGES_FILE = os.getenv("TODUS_SENT_MESSAGES_FILE", str(DATA_DIR / "todus_sent_messages.json"))
 SYNC_APP_STATE_FILE = os.getenv("SYNC_APP_STATE_FILE", str(DATA_DIR / "sync_app.json"))
+AI_ACCOUNTS_FILE = os.getenv("AI_ACCOUNTS_FILE", str(DATA_DIR / "ai_app_accounts.json"))
+ai_auth.configure_storage(AI_ACCOUNTS_FILE)
 # Telegram Bot API no mantiene una sesión local. La sesión MTProto opcional del proyecto
 # sí puede persistirse aquí para incluirla, cifrada, en la copia de seguridad.
 TELEGRAM_AUTH_DIR = DATA_DIR / "telegram_auth"
@@ -5789,6 +5792,82 @@ async def backup_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await message.reply_text(sc("❌ No se pudo enviar el respaldo. Revisa permisos y TELEGRAM_BACKUP_CHAT_ID."))
 
 
+async def create_ai_account_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Create/reset a standalone AiTod4S3 login; never leave the password in chat history."""
+    message = update.effective_message
+    user = update.effective_user
+    chat = update.effective_chat
+    if not message or not user or not chat or chat.type != "private" or not is_admin(user.id):
+        return
+    args = list(context.args or [])
+    try:
+        await message.delete()
+    except Exception:
+        # Fail closed: don't persist a password if the bot cannot erase the command.
+        await context.bot.send_message(chat_id=chat.id, text="No pude borrar el mensaje con la contraseña. No se creó la cuenta; inténtalo de nuevo en el chat privado.")
+        return
+    if len(args) != 2:
+        await context.bot.send_message(chat_id=chat.id, text="Formato: /crear_ia usuario contraseña (mínimo 10 caracteres). Usa solo el chat privado del bot.")
+        return
+    try:
+        ai_auth.create_or_update_account(args[0], args[1])
+    except ValueError as exc:
+        reason = str(exc)
+        text = "Usuario inválido: usa 3–32 letras, números, punto, guion o guion bajo." if reason == "invalid_username" else "Contraseña inválida: debe tener entre 10 y 256 caracteres y no contener controles."
+        await context.bot.send_message(chat_id=chat.id, text=text)
+        return
+    except (RuntimeError, OSError):
+        await context.bot.send_message(chat_id=chat.id, text="No se pudo guardar la cuenta AiTod4S3. Revisa el almacenamiento persistente.")
+        return
+    await context.bot.send_message(chat_id=chat.id, text=f"Cuenta AiTod4S3 creada/actualizada: {args[0]}. Las sesiones anteriores quedaron revocadas.")
+
+
+async def deactivate_ai_account_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Disable a standalone AiTod4S3 account and revoke its sessions."""
+    message = update.effective_message
+    user = update.effective_user
+    chat = update.effective_chat
+    if not message or not user or not chat or chat.type != "private" or not is_admin(user.id):
+        return
+    try:
+        await message.delete()
+    except Exception:
+        await context.bot.send_message(chat_id=chat.id, text="No pude borrar el comando. La cuenta no fue modificada.")
+        return
+    if len(context.args or []) != 1:
+        await context.bot.send_message(chat_id=chat.id, text="Formato: /desactivar_ia usuario (solo en chat privado).")
+        return
+    try:
+        changed = ai_auth.deactivate_account(context.args[0])
+    except (RuntimeError, OSError):
+        await context.bot.send_message(chat_id=chat.id, text="No se pudo actualizar la cuenta AiTod4S3.")
+        return
+    await context.bot.send_message(chat_id=chat.id, text="Cuenta desactivada y sesiones revocadas." if changed else "La cuenta no existe o ya estaba desactivada.")
+
+
+async def release_ai_device_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Release a lost/replaced Android device from an AiTod4S3 account."""
+    message = update.effective_message
+    user = update.effective_user
+    chat = update.effective_chat
+    if not message or not user or not chat or chat.type != "private" or not is_admin(user.id):
+        return
+    try:
+        await message.delete()
+    except Exception:
+        await context.bot.send_message(chat_id=chat.id, text="No pude borrar el comando. El dispositivo no fue liberado.")
+        return
+    if len(context.args or []) != 1:
+        await context.bot.send_message(chat_id=chat.id, text="Formato: /liberar_ia usuario (solo en chat privado).")
+        return
+    try:
+        changed = ai_auth.release_account_device(context.args[0])
+    except (RuntimeError, OSError):
+        await context.bot.send_message(chat_id=chat.id, text="No se pudo liberar el dispositivo AiTod4S3.")
+        return
+    await context.bot.send_message(chat_id=chat.id, text="Dispositivo liberado y sesiones revocadas. El próximo Android que inicie sesión quedará vinculado." if changed else "La cuenta no existe, está desactivada o no tenía un dispositivo vinculado.")
+
+
 async def jkadmin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not is_private_update(update):
         return
@@ -9228,6 +9307,9 @@ def main() -> None:
     application.add_handler(CommandHandler("top", top_command))
     application.add_handler(CommandHandler("backup", backup_command))
     application.add_handler(CommandHandler("jkadmin", jkadmin_command))
+    application.add_handler(CommandHandler("crear_ia", create_ai_account_command))
+    application.add_handler(CommandHandler("desactivar_ia", deactivate_ai_account_command))
+    application.add_handler(CommandHandler("liberar_ia", release_ai_device_command))
     application.add_handler(CommandHandler("reply", owner_reply_command))
     application.add_handler(CallbackQueryHandler(button_callback))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_app_support_keywords), group=-1)

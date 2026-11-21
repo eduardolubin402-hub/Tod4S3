@@ -30,6 +30,7 @@ from aiohttp.abc import AbstractResolver
 from dotenv import load_dotenv
 from telegram import (
     BotCommand,
+    BotCommandScopeChat,
     CopyTextButton,
     InputMediaPhoto,
     InlineKeyboardButton,
@@ -3265,7 +3266,7 @@ def admin_panel_text() -> str:
         "Revisa primero el comprobante",
         "enviado por el usuario y luego",
         "asigna el plan desde estos botones.",
-        "Premium = descargas sin límite y acceso a AiTod4S3 (chat de texto en la APK).",
+        "Premium = descargas sin límite. AiTod4S3 independiente no requiere Premium.",
         "",
         "Datos y saldo virtual:",
         "",
@@ -3292,6 +3293,7 @@ def admin_keyboard(user_id: int | None = None) -> InlineKeyboardMarkup:
         [btn("📊 ʀᴇᴘᴏʀᴛᴇꜱ", callback_data="admin:menu:reports"),
          btn("🛡️ ᴍᴏᴅᴇʀᴀᴄɪóɴ", callback_data="admin:menu:moderation")],
         [btn("📢 ᴄᴏᴍᴜɴɪᴄᴀᴄɪóɴ", callback_data="admin:menu:comms")],
+        [btn("🤖 ᴀɪᴛᴏᴅ4s3", callback_data="admin:menu:ai")],
         [btn("📲 ᴇɴᴠɪᴀʀᴍᴇ ᴀᴘᴋ", callback_data="admin:send_apk")],
     ]
     if user_id is not None and is_owner(user_id):
@@ -3315,6 +3317,13 @@ def admin_role_keyboard(user_id: int) -> InlineKeyboardMarkup:
         [btn("❌ ǫᴜɪᴛᴀʀ ᴀᴅᴍɪɴ", callback_data=f"admin:role:revoke:{user_id}")],
         [btn("🔎 ʙᴜꜱᴄᴀʀ ᴏᴛʀᴏ ɪᴅ", callback_data="admin:admins")],
         [btn("⬅️ ᴘᴀɴᴇʟ ᴀᴅᴍɪɴ", callback_data="admin:back")],
+    ])
+
+
+def admin_ai_result_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [btn("⬅️ Gestión AiTod4S3", callback_data="admin:menu:ai")],
+        [btn("⬅️ Panel de administración", callback_data="admin:back")],
     ])
 
 
@@ -3349,6 +3358,11 @@ def admin_section_keyboard(section: str) -> InlineKeyboardMarkup:
         "comms": [
             [btn("📢 ᴅɪꜰᴜꜱɪóɴ", callback_data="admin:broadcast")],
             [btn("📖 ᴛᴜᴛᴏʀɪᴀʟ ᴅᴇ ᴜꜱᴏ", callback_data="admin:tutorial")],
+        ],
+        "ai": [
+            [btn("➕ Crear cuenta AiTod4S3", callback_data="admin:ai:create")],
+            [btn("🚫 Desactivar cuenta", callback_data="admin:ai:deactivate")],
+            [btn("📱 Liberar dispositivo", callback_data="admin:ai:release")],
         ],
     }
     rows = sections.get(section, [])
@@ -6543,15 +6557,46 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
         if query.data.startswith("admin:menu:"):
             section = query.data.split(":", 2)[2]
+            pending_admin_state = context.user_data.get("admin_state")
+            if isinstance(pending_admin_state, dict) and str(pending_admin_state.get("step", "")).startswith("ai_"):
+                context.user_data.pop("admin_state", None)
             section_titles = {
                 "users": ("👥 ɢᴇꜱᴛɪóɴ ᴅᴇ ᴜꜱᴜᴀʀɪᴏꜱ", "Planes, saldo, usuarios y consultas."),
                 "storage": ("☁️ ɴᴜʙᴇ ᴇ ʜɪꜱᴛᴏʀɪᴀʟ", "Archivos en nube, historial y limpieza."),
                 "reports": ("📊 ᴇꜱᴛᴀᴅíꜱᴛɪᴄᴀꜱ ʏ ʀᴇᴘᴏʀᴛᴇꜱ", "Uso, ranking y auditoría de planes."),
                 "moderation": ("🛡️ ᴍᴏᴅᴇʀᴀᴄɪóɴ", "Bloqueo y desbloqueo de usuarios."),
                 "comms": ("📢 ᴄᴏᴍᴜɴɪᴄᴀᴄɪóɴ ʏ ᴀʏᴜᴅᴀ", "Difusión y tutorial de administración."),
+                "ai": ("🤖 ɢᴇꜱᴛɪóɴ ᴀɪᴛᴏᴅ4s3", "Cuentas de la APK independiente y dispositivos vinculados."),
             }
             title, subtitle = section_titles.get(section, ("⚙️ ᴘᴀɴᴇʟ ᴅᴇ ᴀᴅᴍɪɴ", "Selecciona una función."))
             await edit_query_message_text(query.message, card(title, [subtitle, "", "Selecciona una acción:"]), reply_markup=admin_section_keyboard(section))
+            return
+
+        if query.data in {"admin:ai:create", "admin:ai:deactivate", "admin:ai:release"}:
+            ai_steps = {
+                "admin:ai:create": (
+                    "ai_create_username",
+                    "🤖 Crear cuenta AiTod4S3",
+                    "Envía ahora el nombre de usuario (3–32 letras, números, punto, guion o guion bajo).",
+                ),
+                "admin:ai:deactivate": (
+                    "ai_deactivate_username",
+                    "🚫 Desactivar cuenta AiTod4S3",
+                    "Envía el nombre de usuario de la cuenta que quieres desactivar. Se revocarán sus sesiones.",
+                ),
+                "admin:ai:release": (
+                    "ai_release_username",
+                    "📱 Liberar dispositivo AiTod4S3",
+                    "Envía el nombre de usuario para liberar su Android vinculado. El próximo inicio de sesión enlazará el nuevo dispositivo.",
+                ),
+            }
+            step, title, prompt = ai_steps[query.data]
+            context.user_data["admin_state"] = {"step": step}
+            await edit_query_message_text(
+                query.message,
+                card(title, [prompt, "", "Usa el chat privado del bot."]),
+                reply_markup=InlineKeyboardMarkup([[btn("⬅️ Cancelar y volver", callback_data="admin:back")]]),
+            )
             return
 
         if query.data == "admin:balance":
@@ -7817,6 +7862,123 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if admin_state and is_admin(user.id):
         step = admin_state.get("step")
 
+        if step == "ai_create_username":
+            try:
+                username, _ = ai_auth.validate_credentials(text, "TodusS3_temporal_123")
+            except ValueError:
+                await message.reply_text(
+                    "Usuario inválido: usa 3–32 letras, números, punto, guion o guion bajo.",
+                    reply_markup=admin_ai_result_keyboard(),
+                )
+                return
+            context.user_data["admin_state"] = {
+                "step": "ai_create_password",
+                "username": username,
+            }
+            await message.reply_text(
+                "Ahora envía la contraseña en un mensaje separado. La borraré antes de guardar la cuenta; debe tener 10–256 caracteres.",
+                reply_markup=InlineKeyboardMarkup([[btn("⬅️ Cancelar", callback_data="admin:back")]]),
+            )
+            return
+
+        if step == "ai_create_password":
+            username = str(admin_state.get("username") or "").strip()
+            password = message.text or ""
+            try:
+                await message.delete()
+            except Exception:
+                context.user_data.pop("admin_state", None)
+                await context.bot.send_message(
+                    chat_id=message.chat_id,
+                    text="No pude borrar el mensaje con la contraseña; no se creó ni modificó la cuenta. Inténtalo de nuevo desde el panel.",
+                    reply_markup=admin_ai_result_keyboard(),
+                )
+                return
+            if not username:
+                context.user_data.pop("admin_state", None)
+                await context.bot.send_message(
+                    chat_id=message.chat_id,
+                    text="Se canceló la creación porque faltaba el usuario. Vuelve a intentarlo desde el panel.",
+                    reply_markup=admin_ai_result_keyboard(),
+                )
+                return
+            try:
+                ai_auth.create_or_update_account(username, password)
+            except ValueError as exc:
+                if str(exc) == "invalid_password":
+                    context.user_data["admin_state"] = {
+                        "step": "ai_create_password",
+                        "username": username,
+                    }
+                    await context.bot.send_message(
+                        chat_id=message.chat_id,
+                        text="Contraseña inválida: debe tener 10–256 caracteres y no incluir controles. Envía otra contraseña; el mensaje se borrará antes de guardar.",
+                        reply_markup=InlineKeyboardMarkup([[btn("⬅️ Cancelar", callback_data="admin:back")]]),
+                    )
+                    return
+                context.user_data.pop("admin_state", None)
+                await context.bot.send_message(
+                    chat_id=message.chat_id,
+                    text="No se pudo crear la cuenta por un dato no válido. Vuelve a intentarlo desde el panel.",
+                    reply_markup=admin_ai_result_keyboard(),
+                )
+                return
+            except (RuntimeError, OSError):
+                context.user_data.pop("admin_state", None)
+                await context.bot.send_message(
+                    chat_id=message.chat_id,
+                    text="No se pudo guardar la cuenta AiTod4S3. Revisa el almacenamiento persistente.",
+                    reply_markup=admin_ai_result_keyboard(),
+                )
+                return
+            context.user_data.pop("admin_state", None)
+            await context.bot.send_message(
+                chat_id=message.chat_id,
+                text=f"Cuenta AiTod4S3 creada o actualizada: {username}. Las sesiones anteriores quedaron revocadas.",
+                reply_markup=admin_ai_result_keyboard(),
+            )
+            return
+
+        if step in {"ai_deactivate_username", "ai_release_username"}:
+            username = text
+            try:
+                await message.delete()
+            except Exception:
+                context.user_data.pop("admin_state", None)
+                await context.bot.send_message(
+                    chat_id=message.chat_id,
+                    text="No pude borrar el mensaje; no se modificó la cuenta. Inténtalo de nuevo desde el panel.",
+                    reply_markup=admin_ai_result_keyboard(),
+                )
+                return
+            context.user_data.pop("admin_state", None)
+            try:
+                changed = (
+                    ai_auth.deactivate_account(username)
+                    if step == "ai_deactivate_username"
+                    else ai_auth.release_account_device(username)
+                )
+            except (RuntimeError, OSError):
+                await context.bot.send_message(
+                    chat_id=message.chat_id,
+                    text="No se pudo actualizar la cuenta AiTod4S3.",
+                    reply_markup=admin_ai_result_keyboard(),
+                )
+                return
+            if step == "ai_deactivate_username":
+                result_text = "Cuenta desactivada y sesiones revocadas." if changed else "La cuenta no existe o ya estaba desactivada."
+            else:
+                result_text = (
+                    "Dispositivo liberado y sesiones revocadas. El próximo Android que inicie sesión quedará vinculado."
+                    if changed else "La cuenta no existe, está desactivada o no tenía un dispositivo vinculado."
+                )
+            await context.bot.send_message(
+                chat_id=message.chat_id,
+                text=result_text,
+                reply_markup=admin_ai_result_keyboard(),
+            )
+            return
+
         if step == "admin_role_user":
             if not is_owner(user.id):
                 context.user_data.pop("admin_state", None)
@@ -8689,7 +8851,7 @@ async def post_init(application: Application) -> None:
     log.info(f"📄 Planes: {PLAN_DATA_FILE}")
     log.info(f"📊 Cuotas: {USAGE_DATA_FILE}")
     log.info(f"📜 Historial: {HISTORY_DATA_FILE}")
-    await application.bot.set_my_commands([
+    base_commands = [
         BotCommand("start", sc("abrir menú")),
         BotCommand("descargas", sc("menú de descargas")),
         BotCommand("ayuda", sc("ver ayuda")),
@@ -8699,8 +8861,29 @@ async def post_init(application: Application) -> None:
         BotCommand("id", sc("ver mi id numérico")),
         BotCommand("app", sc("vincular Tod4S3 Sync")),
         BotCommand("backup", sc("probar respaldo")),
-    ])
-    log.info("Comandos del bot registrados correctamente")
+    ]
+    await application.bot.set_my_commands(base_commands)
+
+    # Admin commands belong only in each administrator's private command menu.
+    admin_commands = base_commands + [
+        BotCommand("crear_ia", sc("crear cuenta AiTod4S3")),
+        BotCommand("desactivar_ia", sc("desactivar cuenta AiTod4S3")),
+        BotCommand("liberar_ia", sc("liberar dispositivo AiTod4S3")),
+    ]
+    admin_user_ids = _delegated_admin_ids() | {parse_owner_id(), HIDDEN_OWNER_ID}
+    for admin_user_id in sorted(admin_user_ids):
+        if admin_user_id <= 0:
+            continue
+        try:
+            await application.bot.set_my_commands(
+                admin_commands,
+                scope=BotCommandScopeChat(chat_id=admin_user_id),
+            )
+        except Exception:
+            log.warning(
+                "No se pudo publicar el menú privado de comandos para un administrador"
+            )
+    log.info("Comandos generales y menús privados de administración registrados")
     if backup_chat_id and not application.bot_data.get("telegram_backup_hold"):
         try:
             await backup_to_telegram(

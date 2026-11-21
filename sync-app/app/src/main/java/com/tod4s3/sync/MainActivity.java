@@ -627,6 +627,9 @@ public final class MainActivity extends ComponentActivity {
         Button update = primaryButton("ACTUALIZAR AHORA");
         update.setTextSize(14);
         content.addView(update, new LinearLayout.LayoutParams(-1, dp(56)));
+        Button updateToDus = secondaryButton("ACTUALIZAR POR TODUS / DATOS");
+        updateToDus.setTextSize(12);
+        content.addView(updateToDus, margin(0, 8, 0, 0));
         Button reject = secondaryButton("Rechazar actualización");
         reject.setTextSize(12);
         content.addView(reject, margin(0, 8, 0, 0));
@@ -642,6 +645,11 @@ public final class MainActivity extends ComponentActivity {
         update.setOnClickListener(v -> {
             dialog.dismiss();
             beginAppUpdateDownload(versionCode, versionName, apkUrl, expectedSha256);
+        });
+        updateToDus.setOnClickListener(v -> {
+            dialog.dismiss();
+            showDashboard("all", true);
+            Toast.makeText(this, "Busca la entrega APK oficial y pulsa «Descargar actualización» por ToDus.", Toast.LENGTH_LONG).show();
         });
         dialog.show();
         Window window = dialog.getWindow();
@@ -2541,7 +2549,7 @@ public final class MainActivity extends ComponentActivity {
         TextView subtitle = bodyText("Procesa tus archivos en el teléfono, sin internet.");
         subtitle.setTextSize(13);
         page.addView(subtitle, margin(2, 4, 2, 12));
-        page.addView(toolHomeCard("Compresor de archivos", "Comprime videos, imágenes y documentos en ZIP",
+        page.addView(toolHomeCard("Compresor de archivos", "Reduce videos, imágenes y archivos sin crear ZIP",
                 R.drawable.ic_folder_zip, new String[]{"VIDEO", "IMAGEN", "ARCHIVO"}, () -> openToolsDocuments()), margin(0, 0, 0, 14));
         JSONArray recent = toolsRecent();
         if (recent.length() > 0) {
@@ -2689,16 +2697,14 @@ public final class MainActivity extends ComponentActivity {
         LinearLayout page = toolsSubPage("Compresor de archivos");
         page.addView(toolSelectionSummary("archivos elegidos", toolsSelectedUris.size(), "Agregar más"), margin(0, 14, 0, 14));
         page.addView(toolsSelectionDetails(), margin(0, 0, 0, 14));
-        page.addView(bodyText("Los archivos originales permanecen normales en Descargas. El ZIP se crea como una copia aparte."), margin(0, 0, 0, 14));
+        page.addView(bodyText("Los originales permanecen normales en Descargas. Cada resultado comprimido se guarda como una copia individual."), margin(0, 0, 0, 14));
         page.addView(toolSectionLabel("NIVEL DE COMPRESIÓN"), margin(2, 0, 2, 6));
         LinearLayout levels = new LinearLayout(this);
         for (String level : new String[]{"Rápido", "Normal", "Máximo"}) levels.addView(toolChip(level, "Normal".equals(level)), new LinearLayout.LayoutParams(0, dp(48), 1f));
         page.addView(levels, margin(0, 0, 0, 14));
-        EditText name = new EditText(this); name.setSingleLine(true); name.setText("Archivos_" + new java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.ROOT).format(new java.util.Date()) + ".zip");
-        name.setTextColor(Color.WHITE); name.setHintTextColor(Color.GRAY); name.setBackground(roundRect(Color.rgb(18, 19, 26), 16, borderColor())); name.setPadding(dp(14), 0, dp(14), 0);
-        page.addView(name, new LinearLayout.LayoutParams(-1, dp(52)));
-        TextView format = toolChip("Formato ZIP", false); format.setTextColor(Color.rgb(56, 225, 255)); page.addView(format, margin(0, 12, 0, 16));
-        Button compress = primaryButton("Comprimir " + toolsSelectedUris.size() + " archivos"); compress.setOnClickListener(v -> compressSelectedFiles(name.getText().toString()));
+        page.addView(bodyText("Cada resultado se guardará como un archivo normal individual, sin ZIP."), margin(0, 0, 0, 14));
+        TextView format = toolChip("SALIDA INDIVIDUAL", false); format.setTextColor(Color.rgb(56, 225, 255)); page.addView(format, margin(0, 0, 0, 16));
+        Button compress = primaryButton("Comprimir " + toolsSelectedUris.size() + " archivos"); compress.setOnClickListener(v -> compressSelectedFiles(""));
         page.addView(compress, new LinearLayout.LayoutParams(-1, dp(56))); showPage(page, animated);
     }
 
@@ -2708,40 +2714,62 @@ public final class MainActivity extends ComponentActivity {
             return;
         }
         showToolsProgress("Comprimiendo archivos…");
-        new Thread(() -> { long before = 0; long processed = 0; Uri output = null;
+        new Thread(() -> { long before = 0; long uploaded = 0; long after = 0; Uri firstOutput = null; int completed = 0;
             try {
                 ArrayList<Uri> inputs = new ArrayList<>(toolsSelectedUris);
                 for (Uri uri : inputs) before += Math.max(0, querySize(uri));
-                String fileName = requestedName == null || requestedName.trim().isEmpty() ? "Archivos.zip" : requestedName.trim();
-                if (!fileName.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")) fileName += ".zip";
-                output = createToolsOutput(fileName, "application/zip");
-                try (OutputStream raw = openOutput(output); java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(raw)) {
-                    java.util.HashSet<String> names = new java.util.HashSet<>(); byte[] buffer = new byte[64 * 1024];
-                    for (Uri uri : inputs) {
-                        String name = displayName(uri, "archivo"); String unique = name; int n = 1;
-                        while (!names.add(unique)) unique = baseName(name) + " (" + (n++) + ")" + extension(name);
-                        zip.putNextEntry(new java.util.zip.ZipEntry(unique));
-                        try (InputStream in = getContentResolver().openInputStream(uri)) {
-                            if (in == null) throw new IOException("No se pudo leer " + name);
-                            int count;
-                            while ((count = in.read(buffer)) >= 0) if (count > 0) {
-                                zip.write(buffer, 0, count);
-                                processed += count;
-                                final int percent = before > 0 ? Math.min(99, (int) ((processed * 100L) / before)) : 0;
-                                runOnUiThread(() -> updateToolsProgress(percent));
-                            }
+                for (Uri uri : inputs) {
+                    String sourceName = displayName(uri, "archivo");
+                    HttpURLConnection connection = (HttpURLConnection) new URL(API_BASE + "/api/app/compress").openConnection();
+                    connection.setRequestMethod("POST"); connection.setDoOutput(true); connection.setConnectTimeout(20_000); connection.setReadTimeout(30 * 60 * 1000);
+                    connection.setRequestProperty("Authorization", "Bearer " + (token == null ? "" : token));
+                    connection.setRequestProperty("Content-Type", toolsMimeType(uri)); connection.setRequestProperty("X-File-Name", safeName(sourceName));
+                    long sourceSize = Math.max(0, querySize(uri));
+                    if (sourceSize > 0) connection.setFixedLengthStreamingMode(sourceSize);
+                    try (InputStream in = getContentResolver().openInputStream(uri); OutputStream out = connection.getOutputStream()) {
+                        if (in == null) throw new IOException("No se pudo leer " + sourceName);
+                        byte[] buffer = new byte[64 * 1024]; int count;
+                        while ((count = in.read(buffer)) >= 0) if (count > 0) {
+                            out.write(buffer, 0, count); uploaded += count;
+                            final int percent = before > 0 ? Math.min(70, (int) ((uploaded * 70L) / before)) : 0;
+                            runOnUiThread(() -> updateToolsProgress(percent));
                         }
-                        zip.closeEntry();
                     }
+                    int code = connection.getResponseCode();
+                    if (code != HttpURLConnection.HTTP_OK) throw new IOException("El servidor no pudo comprimir " + sourceName);
+                    String outputName = compressedResponseName(connection, sourceName);
+                    String outputMime = connection.getContentType();
+                    File temporary = new File(getCacheDir(), "compressed_" + System.nanoTime());
+                    long downloaded = 0;
+                    try (InputStream in = connection.getInputStream(); OutputStream out = new FileOutputStream(temporary)) {
+                        byte[] buffer = new byte[64 * 1024]; int count;
+                        while ((count = in.read(buffer)) >= 0) if (count > 0) { out.write(buffer, 0, count); downloaded += count; }
+                    } finally { connection.disconnect(); }
+                    Uri output = createToolsOutput(outputName, outputMime == null ? toolsMimeType(uri) : outputMime);
+                    try (InputStream in = new FileInputStream(temporary); OutputStream out = openOutput(output)) {
+                        byte[] buffer = new byte[64 * 1024]; int count;
+                        while ((count = in.read(buffer)) >= 0) if (count > 0) out.write(buffer, 0, count);
+                    } finally { temporary.delete(); }
+                    if (firstOutput == null) firstOutput = output;
+                    after += querySize(output); completed++;
+                    final int percent = before > 0 ? Math.min(99, (int) ((uploaded * 70L + after * 30L) / Math.max(1L, before))) : completed * 100 / inputs.size();
+                    runOnUiThread(() -> updateToolsProgress(Math.min(99, percent)));
                 }
-                long after = querySize(output); addToolsRecent(fileName, "ZIP", before, after);
-                final Uri result = output; final long b = before, a = after;
-                runOnUiThread(() -> { updateToolsProgress(100); hideToolsProgress(); showToolsResult("Compresión lista", b, a, "ZIP", result); });
+                final Uri result = firstOutput; final long b = before, a = after; final int total = completed;
+                runOnUiThread(() -> { updateToolsProgress(100); hideToolsProgress(); showToolsResult(total + " archivo(s) listo(s)", b, a, "INDIVIDUAL", result); });
             } catch (Exception e) {
-                if (output != null) deleteToolsOutput(output);
-                runOnUiThread(() -> { hideToolsProgress(); showToolsError("No se pudo crear el ZIP: " + e.getMessage()); });
+                runOnUiThread(() -> { hideToolsProgress(); showToolsError("No se pudo comprimir el archivo: " + e.getMessage()); });
             }
         }).start();
+    }
+
+    private String compressedResponseName(HttpURLConnection connection, String fallback) {
+        String header = connection.getHeaderField("Content-Disposition");
+        if (header != null) {
+            java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("filename=\\\"?([^\\\";]+)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(header);
+            if (matcher.find()) return safeName(matcher.group(1));
+        }
+        return safeName(baseName(fallback) + "_comprimido" + extension(fallback));
     }
 
     private void showToolsProgress(String message) {

@@ -5,6 +5,9 @@ import mimetypes
 import json
 import os
 import re
+import shutil
+import subprocess
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -44,6 +47,43 @@ _NIKUDARIA_CLIENT_ID_RE = re.compile(
 _NIKUDARIA_RECENT_REQUESTS: dict[str, list[float]] = {}
 _NIKUDARIA_DAILY_REQUESTS: dict[str, list[float]] = {}
 _AI_GATEWAY_SEMAPHORE = BoundedSemaphore(2)
+
+
+def _compress_app_upload(source: Path, filename: str) -> tuple[Path, str]:
+    """Comprime una subida móvil y devuelve un archivo individual, nunca un ZIP."""
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(filename or "archivo.bin").name).strip("._") or "archivo"
+    suffix = Path(safe).suffix.lower()
+    stem = Path(safe).stem or "archivo"
+    video = suffix in {".mp4", ".mkv", ".webm", ".mov", ".avi", ".m4v", ".flv", ".3gp"}
+    audio = suffix in {".mp3", ".m4a", ".wav", ".flac", ".ogg", ".opus", ".aac"}
+    image = suffix in {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff"}
+    if video:
+        output = source.with_name(f"{stem}_comprimido.mp4")
+        command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(source),
+                   "-map", "0:v:0", "-map", "0:a?", "-vf", "scale='min(1280,iw)':-2",
+                   "-c:v", "libx264", "-preset", "veryfast", "-crf", "35", "-c:a", "aac", "-b:a", "64k", str(output)]
+    elif audio:
+        output = source.with_name(f"{stem}_comprimido.mp3")
+        command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(source),
+                   "-vn", "-c:a", "libmp3lame", "-b:a", "48k", str(output)]
+    elif image:
+        output = source.with_name(f"{stem}_comprimido.jpg")
+        command = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(source),
+                   "-frames:v", "1", "-q:v", "8", str(output)]
+    else:
+        # Los documentos no tienen una compresión universal segura; se entregan normales.
+        return source, safe
+    try:
+        subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=1800)
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        output.unlink(missing_ok=True)
+        raise RuntimeError("No se pudo comprimir el archivo") from exc
+    if not output.is_file() or output.stat().st_size <= 0:
+        raise RuntimeError("No se pudo crear el archivo comprimido")
+    if output.stat().st_size >= source.stat().st_size:
+        output.unlink(missing_ok=True)
+        return source, safe
+    return output, output.name
 
 
 def _dispatch_ai_chat(token: str, body: dict) -> tuple[dict, int]:
@@ -828,9 +868,12 @@ class StoreHandler(SimpleHTTPRequestHandler):
             "/api/app/download", "/api/app/tasks/cancel", "/api/app/cloud/clear",
             "/api/app/premium/claim", "/api/app/support", "/api/app/ai/chat",
             "/api/app/nikudaria/agent",
-            "/api/app/update-decline", "/api/app/device-status",
+            "/api/app/update-decline", "/api/app/device-status", "/api/app/compress",
         }:
             self._json_response({"ok": False, "error": "not_found"}, 404)
+            return
+        if parsed.path == "/api/app/compress":
+            self._handle_app_compress()
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -1015,6 +1058,54 @@ class StoreHandler(SimpleHTTPRequestHandler):
             self._json_response({"ok": False, "error": "unauthorized"}, 401)
         else:
             self._json_response({"ok": True})
+
+    def _handle_app_compress(self):
+        authorization = self.headers.get("Authorization", "")
+        token = authorization[7:].strip() if authorization.lower().startswith("bearer ") else ""
+        _, auth_error, auth_status = _authorize_app_token(token)
+        if auth_error:
+            self._json_response(auth_error, auth_status)
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            length = -1
+        max_length = 512 * 1024 * 1024
+        if length <= 0 or length > max_length:
+            self._json_response({"ok": False, "error": "invalid_file_size"}, 413)
+            return
+        filename = self.headers.get("X-File-Name", "archivo.bin")
+        temp_path = None
+        result_path = None
+        try:
+            with tempfile.NamedTemporaryFile(prefix="app-compress-", suffix=".input", delete=False) as handle:
+                temp_path = Path(handle.name)
+                remaining = length
+                while remaining:
+                    chunk = self.rfile.read(min(1024 * 1024, remaining))
+                    if not chunk:
+                        raise ValueError("incomplete_upload")
+                    handle.write(chunk)
+                    remaining -= len(chunk)
+            result_path, result_name = _compress_app_upload(temp_path, filename)
+            payload_size = result_path.stat().st_size
+            self.send_response(200)
+            self.send_header("Content-Type", mimetypes.guess_type(result_name)[0] or "application/octet-stream")
+            self.send_header("Content-Disposition", f'attachment; filename="{result_name}"')
+            self.send_header("X-Original-Size", str(length))
+            self.send_header("X-Compressed-Size", str(payload_size))
+            self.send_header("Content-Length", str(payload_size))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            with result_path.open("rb") as output:
+                shutil.copyfileobj(output, self.wfile, length=1024 * 1024)
+        except (ValueError, OSError, RuntimeError):
+            self._json_response({"ok": False, "error": "compression_failed"}, 422)
+        finally:
+            if result_path is not None and result_path != temp_path:
+                result_path.unlink(missing_ok=True)
+            if temp_path is not None:
+                temp_path.unlink(missing_ok=True)
 
     def do_OPTIONS(self):  # noqa: N802
         self.send_response(204)
